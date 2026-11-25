@@ -55,6 +55,8 @@ var heal_flash := 0.0
 var power_flash := 0.0
 var shake := 0.0
 var bob_t := 0.0
+var _was_on_floor := true
+var _fall_speed := 0.0
 var move_amount := 0.0
 var invuln := 0.0
 var dash_time := 0.0
@@ -223,11 +225,14 @@ func _physics_process(delta: float) -> void:
 			velocity.y -= GRAVITY * delta
 		elif _controls_active() and Input.is_action_just_pressed("jump"):
 			velocity.y = JUMP_VELOCITY
+			Sfx.play("jump", -10.0, 0.08, 0.2)
+	var bob_before := bob_t
 	move_and_slide()
 	# view bob
 	var hspeed := Vector2(velocity.x, velocity.z).length()
 	move_amount = lerpf(move_amount, clampf(hspeed / move_speed(), 0.0, 1.0) if is_on_floor() else 0.0, clampf(delta * 10.0, 0, 1))
 	bob_t += delta * hspeed * 0.95
+	_movement_sounds(bob_before, hspeed)
 	var shake_off := Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * shake * 0.06
 	head.position = Vector3(0, EYE_HEIGHT + sin(bob_t * 2.0) * 0.045 * move_amount, 0) + shake_off
 	shake = maxf(shake - delta * 3.0, 0.0)
@@ -238,6 +243,10 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	hurt_flash = maxf(hurt_flash - delta * 1.6, 0.0)
 	heal_flash = maxf(heal_flash - delta * 1.5, 0.0)
+	if alive and hp < max_hp * 0.3:
+		# the heart races as the champion bleeds out
+		var k := clampf(hp / (max_hp * 0.3), 0.0, 1.0)
+		Sfx.play("heartbeat", lerpf(-2.0, -9.0, k), 0.0, lerpf(0.62, 1.05, k))
 	power_flash = maxf(power_flash - delta * 2.5, 0.0)
 	hit_marker = maxf(hit_marker - delta * 5.0, 0.0)
 	invuln = maxf(invuln - delta, 0.0)
@@ -285,6 +294,21 @@ func _bot(_delta: float) -> void:
 		kit.try_ability("secondary")
 	if hp < max_hp * 0.4:
 		drink_potion()
+
+
+func _movement_sounds(bob_before: float, hspeed: float) -> void:
+	var on_floor := is_on_floor()
+	if not on_floor:
+		_fall_speed = maxf(_fall_speed, -velocity.y)
+	elif not _was_on_floor:
+		if _fall_speed > 6.0:
+			Sfx.play("land", lerpf(-12.0, -3.0, clampf((_fall_speed - 6.0) / 10.0, 0.0, 1.0)), 0.08, 0.15)
+		_fall_speed = 0.0
+	_was_on_floor = on_floor
+	# one footstep at each low point of the view bob (sin(2 * bob_t) bottoms out at 3/4 PI + k PI)
+	if on_floor and dash_time <= 0.0 and hspeed > 1.5:
+		if floori((bob_t - 0.75 * PI) / PI) != floori((bob_before - 0.75 * PI) / PI):
+			Sfx.play("footstep_%d" % randi_range(1, 3), -15.0, 0.1, 0.12)
 
 
 func _controls_active() -> bool:

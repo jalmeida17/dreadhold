@@ -70,8 +70,10 @@ func _ready() -> void:
 				_falling.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 				_falling.position = Vector3(2.0, 14.0, 1.0)
 				add_child(_falling)
+				Sfx.play_at("meteor_fall", global_position + Vector3(0, 4.0, 0), -2.0, 0.1, 0.12)
 		"pool":
 			_decal.scale = Vector3(radius, 1, radius)
+			Sfx.play_at("acid_pool", global_position, -4.0, 0.12, 0.2)
 		"nova":
 			_decal.scale = Vector3(0.5, 1, 0.5)
 			_decal.position.y = 0.15
@@ -122,16 +124,16 @@ func _impact(player: Node3D) -> void:
 		"fire":
 			Fx.spawn(parent, "explosion", global_position + Vector3(0, 0.8, 0), 3.2, 16.0)
 			Fx.flash(parent, global_position + Vector3(0, 1.0, 0), Color(1.0, 0.5, 0.2), 5.0, 8.0, 0.35)
-			Sfx.play_at("fireball_explode", global_position, 0.0)
+			Sfx.play_at("meteor_impact", global_position, 0.0, 0.1, 0.08)
 		"acid":
 			Fx.spawn(parent, "dust", global_position + Vector3(0, 0.5, 0), 2.0, 14.0, true)
-			Sfx.play_at("bolt_impact", global_position, 0.0)
+			Sfx.play_at("acid_splash", global_position, 0.0, 0.1, 0.08)
 			var pool: Node3D = load(HazardScript).spawn(parent, "pool", global_position, "acid", damage * 0.5, source)
 			pool.radius = radius * 1.1
 			pool.duration = 6.0
 		_:
 			Fx.spawn(parent, "frost", global_position + Vector3(0, 0.6, 0), 2.4, 12.0)
-			Sfx.play_at("frost_nova", global_position, -3.0)
+			Sfx.play_at("ice_shatter", global_position, -2.0, 0.1, 0.08)
 	if player != null and player.alive and _flat_dist(player) <= radius + 0.3 and player.global_position.y < 1.5:
 		player.take_damage(damage, global_position, "smash", null)
 	queue_free()

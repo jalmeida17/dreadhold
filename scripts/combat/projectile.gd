@@ -146,7 +146,7 @@ func _impact(point: Vector3, normal: Vector3, col: Object) -> void:
 	match kind:
 		"ice":
 			Fx.spawn(scene, "frost", point, 1.4, 14.0)
-			Sfx.play_at("bolt_impact", point, -2.0)
+			Sfx.play_at("ice_shatter", point, -5.0)
 			if not from_player and col != null and col.has_method("apply_slow"):
 				col.apply_slow(1.2)
 		"fireball", "ember":
@@ -160,7 +160,7 @@ func _impact(point: Vector3, normal: Vector3, col: Object) -> void:
 		"soul", "acid":
 			Fx.spawn(scene, "portal", point, 1.4, 16.0)
 			Fx.flash(scene, point, Color(0.3, 1.0, 0.4), 3.0, 6.0, 0.3)
-			Sfx.play_at("bolt_impact", point, -1.0)
+			Sfx.play_at("acid_splash" if kind == "acid" else "bolt_impact", point, -1.0)
 		_:
 			var on_enemy := col != null and col.has_method("hurt")
 			if not on_enemy:

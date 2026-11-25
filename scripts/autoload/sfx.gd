@@ -1,10 +1,40 @@
 extends Node
-## Sound effects and music. Sounds are looked up by name in assets/sfx/<name>.wav;
-## missing files are silently ignored so the game runs even without audio.
+## Sound effects, music and ambience beds. Sounds are looked up by name in assets/sfx/ and
+## assets/music/ (<name>.ogg first, then <name>.wav). A missing sound falls back to an older
+## one when FALLBACK names it, otherwise it is silently skipped.
 
 const SFX_DIR := "res://assets/sfx/"
 const MUSIC_DIR := "res://assets/music/"
 const POOL := 20
+const EXTS := [".ogg", ".wav"]
+## Stand-ins used while a newer sound is missing.
+const FALLBACK := {
+	"meteor_impact": "fireball_explode",
+	"acid_splash": "bolt_impact",
+	"shockwave": "brute_smash",
+	"ice_shatter": "frost_nova",
+	"frost_cast": "cultist_cast",
+	"rime_cast": "cultist_cast",
+	"rot_roar": "brute_roar",
+	"rot_death": "brute_death",
+	"cinder_roar": "boss_roar",
+	"cinder_death": "boss_death",
+	"rime_death": "boss_death",
+	"goblin_greet": "coin_pickup",
+	"purchase": "coin_pickup",
+	"weapon_upgrade": "boon_select",
+	"torch_ignite": "fireball_cast",
+	"music_night_1": "music_battle",
+	"music_night_2": "music_night_1",
+	"music_night_3": "music_night_2",
+	"music_night_4": "music_night_3",
+	"music_dawn": "music_menu",
+	"music_defeat": "music_menu",
+	"music_boss_hollow": "music_boss",
+	"music_boss_rot": "music_boss_hollow",
+	"music_boss_cinder": "music_boss_hollow",
+	"music_boss_rime": "music_boss_hollow",
+}
 
 var _cache := {}
 var _players: Array[AudioStreamPlayer] = []
@@ -12,6 +42,8 @@ var _next := 0
 var _music_a: AudioStreamPlayer
 var _music_b: AudioStreamPlayer
 var _music_name := ""
+var _amb: AudioStreamPlayer
+var _amb_name := ""
 var _last_played := {}
 ## 3D sounds are parented here (the world SubViewport) when set.
 var world_root: Node = null
@@ -30,18 +62,35 @@ func _ready() -> void:
 	_music_b = AudioStreamPlayer.new()
 	_music_b.bus = "Music"
 	add_child(_music_b)
+	_amb = AudioStreamPlayer.new()
+	_amb.bus = "SFX"
+	add_child(_amb)
 
 
 func stream_for(sound: String, dir: String = SFX_DIR) -> AudioStream:
 	var key := dir + sound
 	if _cache.has(key):
 		return _cache[key]
-	var path := dir + sound + ".wav"
 	var s: AudioStream = null
-	if ResourceLoader.exists(path):
-		s = load(path)
+	for ext in EXTS:
+		var path: String = dir + sound + ext
+		if ResourceLoader.exists(path):
+			s = load(path)
+			break
+	if s == null and FALLBACK.has(sound):
+		s = stream_for(FALLBACK[sound], dir)
 	_cache[key] = s
 	return s
+
+
+static func _set_loop(s: AudioStream) -> void:
+	if s is AudioStreamOggVorbis:
+		(s as AudioStreamOggVorbis).loop = true
+	elif s is AudioStreamWAV:
+		var w := s as AudioStreamWAV
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		w.loop_begin = 0
+		w.loop_end = int(w.get_length() * w.mix_rate)
 
 
 func _throttled(sound: String, min_gap: float) -> bool:
@@ -105,11 +154,7 @@ func music(track: String, fade: float = 1.5) -> void:
 		tw.tween_callback(old.stop)
 	if s == null:
 		return
-	if s is AudioStreamWAV:
-		var w := s as AudioStreamWAV
-		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		w.loop_begin = 0
-		w.loop_end = int(w.get_length() * w.mix_rate)
+	_set_loop(s)
 	_music_a.stream = s
 	_music_a.volume_db = -40.0
 	_music_a.play()
@@ -124,3 +169,25 @@ func stop_music(fade: float = 1.0) -> void:
 			var tw := create_tween()
 			tw.tween_property(p, "volume_db", -40.0, fade)
 			tw.tween_callback(p.stop)
+
+
+func ambience(track: String, fade: float = 2.0) -> void:
+	## A quiet looping bed under the music (wind, drips, organ drone...). "" stops it.
+	if track == _amb_name:
+		return
+	_amb_name = track
+	var s: AudioStream = stream_for(track, MUSIC_DIR) if track != "" else null
+	if s == null and not _amb.playing:
+		return
+	var tw := create_tween()
+	if _amb.playing:
+		tw.tween_property(_amb, "volume_db", -40.0, fade * 0.5)
+		tw.tween_callback(_amb.stop)
+	if s == null:
+		return
+	_set_loop(s)
+	tw.tween_callback(func():
+		_amb.stream = s
+		_amb.volume_db = -40.0
+		_amb.play())
+	tw.tween_property(_amb, "volume_db", 0.0, fade)

@@ -58,7 +58,7 @@ func greet() -> void:
 		return
 	_greeted = true
 	_greet_t = 1.2
-	Sfx.play_at("coin_pickup", global_position, -2.0)
+	Sfx.play_at("goblin_greet", global_position, 0.0, 0.04, 1.0)
 
 
 func leave() -> void:
@@ -66,6 +66,7 @@ func leave() -> void:
 		return
 	_leaving = true
 	_puff()
+	Sfx.play_at("goblin_laugh", global_position, -2.0, 0.04, 1.0)
 	var tw := create_tween()
 	tw.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.3)
 	tw.tween_callback(queue_free)

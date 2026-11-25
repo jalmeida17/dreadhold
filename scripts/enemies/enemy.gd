@@ -231,7 +231,7 @@ func _walk_anim(delta: float, rate: float) -> void:
 func _begin_attack() -> void:
 	_set_state(State.WINDUP)
 	if is_boss and _cast_mode != "":
-		Sfx.play_at("boss_cast", global_position, 2.0)
+		Sfx.play_at(str(d.get("cast_sfx", "boss_cast")), global_position, 2.0)
 	elif d.get("ranged", false) and type_id == "cultist":
 		Sfx.play_at("cultist_cast", global_position, -2.0, 0.1, 0.4)
 
@@ -309,7 +309,7 @@ func _enter_phase(p: int) -> void:
 	_frozen = false
 	_set_state(State.STUN)
 	sprite.frame = EnemyData.FRAME_CAST if sprite.hframes > 8 else EnemyData.FRAME_PAIN
-	Sfx.play_at("boss_roar", global_position, 6.0)
+	Sfx.play_at(str(d.alert), global_position, 6.0)
 	Fx.ring(get_parent(), global_position, 7.0, Color(0.4, 1.0, 0.5, 1.0), 0.6)
 	Fx.flash(get_parent(), global_position + Vector3(0, 2, 0), Color(0.35, 1.0, 0.45), 6.0, 16.0, 0.6)
 	var d2: float = player.global_position.distance_to(global_position)
@@ -389,7 +389,7 @@ func _boss_cast(mode: String, origin: Vector3, chest: Vector3) -> void:
 				p.owner_enemy = self
 				p.homing = 0.5
 				p.target = player
-			Sfx.play_at("shadow_bolt", origin, 2.0)
+			Sfx.play_at(str(d.get("volley_sfx", "shadow_bolt")), origin, 2.0)
 		"rain", "meteor":
 			# telegraphed strikes on and around the player
 			var count := 3 + phase
@@ -398,13 +398,13 @@ func _boss_cast(mode: String, origin: Vector3, chest: Vector3) -> void:
 				var h: Node3D = Hazard.spawn(get_parent(), "strike", player.global_position + off, style, damage * 0.8, self)
 				h.delay = 1.0 + i * 0.18
 				h.radius = 2.3
-			Sfx.play_at("boss_cast", global_position, 2.0)
+			Sfx.play_at(str(d.get("cast_sfx", "boss_cast")), global_position, 2.0)
 		"nova":
 			var h: Node3D = Hazard.spawn(get_parent(), "nova", global_position, style, damage * 0.7, self)
 			h.max_radius = 18.0
 			h.speed = 11.0 + phase * 2.0
 			Fx.flash(get_parent(), global_position + Vector3(0, 1.5, 0), Color(1.0, 0.5, 0.2), 5.0, 10.0, 0.4)
-			Sfx.play_at("brute_smash", global_position, 4.0)
+			Sfx.play_at("shockwave", global_position, 4.0)
 			player.shake = maxf(player.shake, 0.8)
 		"blink":
 			var rng := RandomNumberGenerator.new()

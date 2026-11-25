@@ -57,6 +57,7 @@ func _ready() -> void:
 	_build_ui()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.music("music_menu")
+	Sfx.ambience("amb_keep")
 	if Game.menu_page == "classes":
 		_show_classes()
 	elif Game.menu_page == "maps":

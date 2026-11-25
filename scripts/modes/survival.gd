@@ -78,7 +78,8 @@ func _ready() -> void:
 	game_over = GameOver.new()
 	add_child(game_over)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	Sfx.music("music_battle")
+	Sfx.music(Maps.night_music(wave + 1))
+	Sfx.ambience(Maps.ambience(Game.selected_map))
 	if Game.test.has("god"):
 		player.invuln = 99999.0
 	if Game.test.has("torch"):
@@ -119,6 +120,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	Sfx.world_root = null
+	Sfx.ambience("")
 
 
 func _build_arena(layout: String) -> void:
@@ -232,7 +234,7 @@ func _start_night() -> void:
 	wave_total = queue.size()
 	spawn_t = 0.5
 	Sfx.play("wave_start")
-	Sfx.music("music_battle")
+	Sfx.music(Maps.night_music(wave))
 	hud.show_banner("NIGHT %s" % UiTheme.roman(wave), _wave_flavour(), Color(0.95, 0.35, 0.25))
 	if Game.test.has("log"):
 		print("[night] start %d with %d foes" % [wave, wave_total])
@@ -319,7 +321,8 @@ func on_enemy_killed(e: Node) -> void:
 		hud.show_banner("%s FALLS" % str(e.d.name).to_upper(), "...but death is patient", e.d.get("color", UiTheme.GOLD))
 		_new_weapon = player.upgrade_weapon()
 		player.heal(player.max_hp)
-		Sfx.music("music_battle")
+		# a breath of silence after the kill; dawn brings its own tune
+		Sfx.stop_music(2.5)
 		# his court crumbles with him
 		for other in get_tree().get_nodes_in_group("enemies"):
 			if other.is_alive():
@@ -369,7 +372,8 @@ func _start_boss_night() -> void:
 	await hud.fade_to(boss_entry.color, 0.9)
 	_build_arena(boss_entry.arena)
 	_place_player()
-	Sfx.music("music_boss")
+	Sfx.music(str(boss_entry.get("music", "music_boss_hollow")), 0.8)
+	Sfx.ambience("amb_boss")
 	await get_tree().create_timer(0.25).timeout
 	hud.fade_from(1.0)
 	hud.show_banner(boss_entry.arena_name, boss_entry.arena_line, boss_entry.color)
@@ -386,7 +390,7 @@ func _start_boss_night() -> void:
 		boss.hp = boss.max_hp
 		boss.damage *= 1.0 + 0.3 * cycle
 	hud.show_boss(boss)
-	Sfx.play_at("boss_roar", arena.boss_spawn(), 6.0)
+	Sfx.play_at(str(boss.d.alert), arena.boss_spawn(), 6.0)
 	hud.show_banner(str(boss.d.name).to_upper(), str(boss.d.title), boss.d.get("color", UiTheme.GOLD))
 
 
@@ -395,10 +399,12 @@ func _return_to_keep() -> void:
 	await hud.fade_to(Color(1.0, 0.9, 0.6), 0.8)
 	_build_arena(Game.selected_map)
 	_place_player()
+	Sfx.ambience(Maps.ambience(Game.selected_map))
 	await get_tree().create_timer(0.2).timeout
 	hud.fade_from(0.9)
 	if _new_weapon:
 		_new_weapon = false
+		Sfx.play("weapon_upgrade")
 		var w: Dictionary = player.weapon()
 		hud.show_banner("NEW WEAPON: %s" % str(w.name).to_upper(), str(w.desc), UiTheme.GOLD)
 		await get_tree().create_timer(3.4).timeout
@@ -410,6 +416,7 @@ func _return_to_keep() -> void:
 func _begin_dawn(from_save: Dictionary = {}) -> void:
 	phase = Phase.DAWN
 	phase_t = 0.0
+	Sfx.music("music_dawn", 2.0)
 	if from_save.is_empty():
 		var bounty := 25 + wave * 10
 		player.gold += bounty
@@ -548,7 +555,7 @@ func pickup_message(text: String) -> void:
 func _on_player_died() -> void:
 	phase = Phase.OVER
 	phase_t = 0.0
-	Sfx.music("music_menu")
+	Sfx.music("music_defeat", 2.5)
 	Sfx.play("game_over")
 	if Game.test.has("log"):
 		print("[player] died at night %d kills=%d" % [wave, player.kills])

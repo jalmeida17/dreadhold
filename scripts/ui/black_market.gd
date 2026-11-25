@@ -488,12 +488,13 @@ func _buy(i: int) -> void:
 			player.heal(player.max_hp)
 		"torch":
 			player.equip_torch()
+			Sfx.play("torch_ignite", -2.0)
 		_:
 			player.apply_boon(w.id)
 	director.stat_add("gold_spent", float(w.price))
 	director.save_run()
-	Sfx.play("coin_pickup")
-	Sfx.play("boon_select", -6.0)
+	Sfx.play("purchase")
+	Sfx.play("goblin_laugh", -8.0, 0.05, 2.5)
 	_laugh_t = 0.8
 	_refresh()
 
