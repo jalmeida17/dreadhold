@@ -24,7 +24,7 @@ func _ready() -> void:
 		Game.settings.fullscreen = on
 		Game.apply_settings())
 	v.add_child(fs)
-	var keys := UiTheme.label("Move %s   -   Jump SPACE   -   Ability %s / SHIFT   -   Potion %s   -   Claim relic %s" % [Game.move_keys_label(), Game.key_label(KEY_E), Game.key_label(KEY_R), Game.key_label(KEY_F)], 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
+	var keys := UiTheme.label("Move %s   -   Jump SPACE   -   Ability %s / SHIFT   -   Potion %s   -   Talk to the goblin %s" % [Game.move_keys_label(), Game.key_label(KEY_E), Game.key_label(KEY_R), Game.key_label(KEY_F)], 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
 	keys.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(keys)
 	var back := Button.new()

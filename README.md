@@ -45,7 +45,7 @@ asset is the [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL 
   - **At dawn**, *Grizzle the black-market goblin* appears. Trade with him to buy abilities and upgrades, potions or healing, or restock his wares.
   - **Every 5th night**, you are teleported to the **Barrow Throne** to fight the Hollow King, a three-phase boss. Each shattered phylactery makes him angrier and summons more of his court.
 - **RTS-inspired console HUD**: minimap with spawn pings, living portrait, and a command card with hotkeys and radial cooldowns. A night dial shows the night's progress, and a boss plate tracks the boss's phylacteries.
-- **Score screen** on defeat, with Overview, Combat and Relics tabs and comparisons to your personal bests.
+- **Score screen** on defeat, with Overview, Combat and Upgrades tabs and comparisons to your personal bests.
 - **Procedural everything**: the generators live in `tools/` and can be re-run at any time.
 
 ## Champions

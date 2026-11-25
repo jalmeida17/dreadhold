@@ -44,11 +44,6 @@ var score_label: Label
 var banner_title: Label
 var banner_sub: Label
 var feed: VBoxContainer
-var tooltip: PanelContainer
-var tip_title: Label
-var tip_rarity: Label
-var tip_desc: Label
-var tip_hint: Label
 var boss_root: Control
 var boss_portrait: TextureRect
 var boss_frames: Array = []
@@ -104,7 +99,6 @@ func setup(p_player: Node, p_director: Node) -> void:
 	_build_top(cls)
 	_build_console(cls)
 	_build_boss_plate()
-	_build_tooltip()
 
 	banner_title = UiTheme.title("", 52, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.position = Vector2(0, 196)
@@ -314,34 +308,6 @@ func _build_boss_plate() -> void:
 		g.pivot_offset = Vector2(8, 10)
 		boss_root.add_child(g)
 		boss_gems.append(g)
-
-
-func _build_tooltip() -> void:
-	tooltip = PanelContainer.new()
-	var sb := StyleBoxTexture.new()
-	sb.texture = load("res://assets/ui/wc3/tooltip.png")
-	for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
-		sb.set_texture_margin(side, 8)
-		sb.set_content_margin(side, 12)
-	tooltip.add_theme_stylebox_override("panel", sb)
-	tooltip.position = Vector2(860, 360)
-	tooltip.custom_minimum_size = Vector2(400, 0)
-	tooltip.visible = false
-	tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(tooltip)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 4)
-	tooltip.add_child(v)
-	tip_title = UiTheme.title("", 22, UiTheme.GOLD)
-	v.add_child(tip_title)
-	tip_rarity = UiTheme.label("", 15, UiTheme.GREY)
-	v.add_child(tip_rarity)
-	tip_desc = UiTheme.label("", 18, UiTheme.CREAM)
-	tip_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tip_desc.custom_minimum_size = Vector2(372, 0)
-	v.add_child(tip_desc)
-	tip_hint = UiTheme.label("", 16, UiTheme.GOLD)
-	v.add_child(tip_hint)
 
 
 # ======================================================================= per frame
@@ -577,25 +543,6 @@ func ping(world_pos: Vector3, color: Color = Color(1.0, 0.25, 0.2)) -> void:
 
 func show_prompt(text: String) -> void:
 	prompt_label.text = text
-
-
-func show_relic(r: Node) -> void:
-	if r == null:
-		tooltip.visible = false
-		return
-	var b: Dictionary = Boons.BOONS[r.boon_id]
-	tip_title.text = str(b.name)
-	tip_title.add_theme_color_override("font_color", r.color)
-	var owned := int(player.boons.get(r.boon_id, 0))
-	var rar := str(b.rarity).capitalize() + " relic"
-	if b.has("class"):
-		rar += "  -  " + str(b["class"]).capitalize() + " only"
-	if owned > 0:
-		rar += "  -  owned %d / %d" % [owned, int(b.max)]
-	tip_rarity.text = rar
-	tip_desc.text = str(b.desc)
-	tip_hint.text = "[%s]  Claim this relic" % Game.key_label(KEY_F)
-	tooltip.visible = true
 
 
 func show_boss(e: Node) -> void:

@@ -1,6 +1,6 @@
 extends CanvasLayer
 ## Defeat screen in the style of a classic RTS score screen: big title, tabbed ornate
-## panel (Overview / Combat / Relics) with comparisons to personal bests.
+## panel (Overview / Combat / Upgrades) with comparisons to personal bests.
 
 const UiTheme := preload("res://scripts/ui/ui_theme.gd")
 const ClassData := preload("res://scripts/data/classes.gd")
@@ -77,8 +77,8 @@ func open(p_director: Node, best: bool) -> void:
 	var body := Control.new()
 	body.custom_minimum_size = Vector2(900, 330)
 	v.add_child(body)
-	var names := ["OVERVIEW", "COMBAT", "RELICS"]
-	var builders := [_page_overview, _page_combat, _page_relics]
+	var names := ["OVERVIEW", "COMBAT", "UPGRADES"]
+	var builders := [_page_overview, _page_combat, _page_upgrades]
 	for i in 3:
 		var t := Button.new()
 		t.text = names[i]
@@ -219,7 +219,7 @@ func _page_combat() -> Control:
 	return v
 
 
-func _page_relics() -> Control:
+func _page_upgrades() -> Control:
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var grid := GridContainer.new()
@@ -229,7 +229,7 @@ func _page_relics() -> Control:
 	scroll.add_child(grid)
 	var owned: Dictionary = director.player.boons
 	if owned.is_empty():
-		grid.add_child(UiTheme.label("No relic was claimed.", 20, UiTheme.GREY))
+		grid.add_child(UiTheme.label("No ability or upgrade was bought from the goblin.", 20, UiTheme.GREY))
 	for id in owned:
 		var b: Dictionary = Boons.BOONS[id]
 		var row := HBoxContainer.new()
