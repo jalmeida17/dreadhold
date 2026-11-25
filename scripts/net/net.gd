@@ -11,7 +11,7 @@ signal status(text: String, is_error: bool)
 const RelayPeer := preload("res://scripts/net/relay_peer.gd")
 ## The production relay (server/relay, Cloudflare Workers). Tests and local runs override it
 ## with the launch flag  relay=ws://127.0.0.1:8791
-const RELAY_URL := "wss://dreadhold-relay.CHANGE_ME.workers.dev"
+const RELAY_URL := "wss://dreadhold-relay.dreadhold-relay.workers.dev"
 const MAX_NAME := 16
 
 var peer: RelayPeer = null
