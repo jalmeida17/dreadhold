@@ -534,10 +534,9 @@ func on_enemy_killed(e: Node) -> void:
 		if duo:
 			Game.net.send("boss_fall", [])
 		_boss_fall_view(e)
-		# his court crumbles with him
+		# his court crumbles with him (minions still rising from the ground included)
 		for other in get_tree().get_nodes_in_group("enemies"):
-			if other.is_alive():
-				other.hurt(99999.0, other.global_position, 0.0, null)
+			other.banish()
 
 
 func _boss_fall_view(e: Node) -> void:
@@ -577,6 +576,12 @@ func add_corpse(holder: Node3D, pos: Vector3) -> void:
 
 
 func _night_cleared() -> void:
+	# the dawn burns whatever is still standing (nothing should be, but never leave a straggler)
+	for c in get_tree().get_nodes_in_group("enemies"):
+		if Game.test.has("log"):
+			print("[night] %s still standing at dawn, burned" % c.type_id)
+		c.banish()
+	alive_count = 0
 	score += wave * 50
 	if duo:
 		Game.net.send("cleared", [wave, score])

@@ -108,6 +108,14 @@ func setup(p_type: String, p_arena: Node3D, p_player: Node3D, p_director: Node, 
 	state_t = 0.0
 
 
+func banish() -> void:
+	## Host: dies at once, whatever it is doing (even rising from the ground).
+	if puppet or state == State.DEAD:
+		return
+	hp = 0.0
+	_die()
+
+
 func make_elite() -> void:
 	## Host side: stronger stats, then the look (puppets only take the look).
 	max_hp *= 2.5
