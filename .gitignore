@@ -21,11 +21,13 @@ desktop.ini
 .venv/
 __pycache__/
 
-# Python venv for the audio generator
-.venv/
 
 # Vercel CLI link
 .vercel/
 
 # Browser test captures
 .playwright-mcp/
+
+# Relay server dependencies and local state
+server/relay/node_modules/
+server/relay/.wrangler/

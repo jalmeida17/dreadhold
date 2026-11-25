@@ -24,16 +24,6 @@ const FALLBACK := {
 	"purchase": "coin_pickup",
 	"weapon_upgrade": "boon_select",
 	"torch_ignite": "fireball_cast",
-	"music_night_1": "music_battle",
-	"music_night_2": "music_night_1",
-	"music_night_3": "music_night_2",
-	"music_night_4": "music_night_3",
-	"music_dawn": "music_menu",
-	"music_defeat": "music_menu",
-	"music_boss_hollow": "music_boss",
-	"music_boss_rot": "music_boss_hollow",
-	"music_boss_cinder": "music_boss_hollow",
-	"music_boss_rime": "music_boss_hollow",
 }
 
 var _cache := {}
