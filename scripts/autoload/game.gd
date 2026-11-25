@@ -91,6 +91,8 @@ func _process(delta: float) -> void:
 	if test.has("shot") and not _shot_done and _clock >= float(test.get("shot_at", "3")):
 		_shot_done = true
 		var img := get_viewport().get_texture().get_image()
+		if img.get_width() != 1280:  # hi-dpi windows: keep README shots at the design size
+			img.resize(1280, 720, Image.INTERPOLATE_LANCZOS)
 		img.save_png(test["shot"])
 		print("screenshot saved: ", test["shot"])
 	if test.has("quit_at") and _clock >= float(test["quit_at"]):
