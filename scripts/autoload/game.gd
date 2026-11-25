@@ -32,6 +32,7 @@ var theme: Theme
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_input()
+	_ask_web_layout()
 	_setup_buses()
 	_load_settings()
 	_load_records()
@@ -53,6 +54,7 @@ func _ready() -> void:
 var test := {}
 var _clock := 0.0
 var _shot_done := false
+var _key_labels := {}
 
 
 func _parse_test_args() -> void:
@@ -122,12 +124,51 @@ func _bind(action: String, keys: Array, buttons: Array = []) -> void:
 
 func key_label(physical: Key) -> String:
 	## Name of the key at this physical position on the current keyboard layout (WASD -> ZQSD on AZERTY).
+	if _key_labels.has(physical):
+		return _key_labels[physical]
 	var k: Key = physical
+	if OS.has_feature("web"):
+		var web := _web_key_label(physical)
+		if web != "":
+			_key_labels[physical] = web
+			return web
+		# layout not known (yet): answer with the physical name, without caching it
+		return OS.get_keycode_string(physical).to_upper()
 	if DisplayServer.get_name() != "headless":
 		k = DisplayServer.keyboard_get_label_from_physical(physical)
 	if k == KEY_NONE:
 		k = physical
-	return OS.get_keycode_string(k).to_upper()
+	var label := OS.get_keycode_string(k).to_upper()
+	_key_labels[physical] = label
+	return label
+
+
+func _ask_web_layout() -> void:
+	## Browsers hide the keyboard layout from Godot; Chromium exposes it to JavaScript.
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval("""
+		window.dreadholdKeys = '';
+		if (navigator.keyboard && navigator.keyboard.getLayoutMap) {
+			navigator.keyboard.getLayoutMap().then(function (m) {
+				var o = {}; m.forEach(function (v, k) { o[k] = v; });
+				window.dreadholdKeys = JSON.stringify(o);
+			}).catch(function () {});
+		}
+	""", true)
+
+
+func _web_key_label(physical: Key) -> String:
+	var name := OS.get_keycode_string(physical)
+	if name.length() != 1 or not name.to_upper().is_valid_identifier():
+		return ""  # only letters move between layouts here
+	var raw = JavaScriptBridge.eval("window.dreadholdKeys || ''", true)
+	if typeof(raw) != TYPE_STRING or str(raw) == "":
+		return ""
+	var layout = JSON.parse_string(str(raw))
+	if typeof(layout) != TYPE_DICTIONARY:
+		return ""
+	return str(layout.get("Key" + name.to_upper(), "")).to_upper()
 
 
 func move_keys_label() -> String:

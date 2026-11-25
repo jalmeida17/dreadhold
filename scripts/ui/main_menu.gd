@@ -155,7 +155,8 @@ Dawn after night %s  -  %d gold" % [cname, mname, UiTheme.roman(int(save.get("wa
 	online.disabled = true
 	online.tooltip_text = "Online battles - coming soon"
 	_menu_button(v, "OPTIONS", _show_options)
-	_menu_button(v, "QUIT", func(): get_tree().quit())
+	if not OS.has_feature("web"):  # a browser tab is closed, not quit
+		_menu_button(v, "QUIT", func(): get_tree().quit())
 	v.add_child(UiTheme.label("Online battles are coming soon", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
 	var ver := UiTheme.label("v%s" % Game.VERSION, 16, UiTheme.GREY)
 	ver.position = Vector2(16, 690)
