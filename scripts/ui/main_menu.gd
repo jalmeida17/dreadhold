@@ -313,11 +313,20 @@ func _build_detail() -> void:
 	hv.add_child(res_l)
 	var rec_l := UiTheme.label("", 16, UiTheme.GOLD)
 	hv.add_child(rec_l)
+	# attributes fill the top-right corner of the panel
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(spacer)
+	var sv := VBoxContainer.new()
+	sv.add_theme_constant_override("separation", 8)
+	sv.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	head.add_child(sv)
+	sv.add_child(UiTheme.title("ATTRIBUTES", 18, UiTheme.GOLD))
 	var stats := GridContainer.new()
 	stats.columns = 2
 	stats.add_theme_constant_override("h_separation", 14)
-	stats.add_theme_constant_override("v_separation", 4)
-	hv.add_child(stats)
+	stats.add_theme_constant_override("v_separation", 10)
+	sv.add_child(stats)
 	var lore := UiTheme.label("", 19, UiTheme.CREAM)
 	lore.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lore.custom_minimum_size = Vector2(660, 0)
@@ -349,12 +358,12 @@ func _preview(id: String) -> void:
 	for ch in stats.get_children():
 		ch.queue_free()
 	for stat in c.stats:
-		stats.add_child(UiTheme.label(str(stat), 16, UiTheme.GREY))
+		stats.add_child(UiTheme.label(str(stat), 18, UiTheme.CREAM))
 		var pips := HBoxContainer.new()
 		pips.add_theme_constant_override("separation", 3)
 		for i in 10:
 			var pip := ColorRect.new()
-			pip.custom_minimum_size = Vector2(16, 9)
+			pip.custom_minimum_size = Vector2(17, 12)
 			pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			pip.color = c.resource_color if i < int(c.stats[stat]) * 2 else Color(0.12, 0.11, 0.13)
 			pips.add_child(pip)
