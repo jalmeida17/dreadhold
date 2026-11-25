@@ -256,130 +256,186 @@ const SLEEVE := Color(0.18, 0.22, 0.13)
 const STITCH := Color(0.55, 0.5, 0.38)
 
 
-static func _rot(v: Vector2, a: float) -> Vector2:
-	return v.rotated(a)
+## Hands are built from a few clean shapes with strict 5-tone ramps (outline, shadow, base,
+## light, highlight), one light direction (top-left), no grain, 1px dark separations.
+const GLOVE_T := [Color(0.07, 0.045, 0.03), Color(0.18, 0.12, 0.075), Color(0.28, 0.195, 0.125), Color(0.39, 0.28, 0.18), Color(0.53, 0.4, 0.26)]
+const BRACER_T := [Color(0.06, 0.05, 0.03), Color(0.14, 0.13, 0.08), Color(0.22, 0.2, 0.125), Color(0.31, 0.29, 0.18), Color(0.42, 0.39, 0.26)]
+const STRAP_T := [Color(0.04, 0.03, 0.02), Color(0.09, 0.07, 0.045), Color(0.14, 0.1, 0.065), Color(0.2, 0.15, 0.1), Color(0.28, 0.21, 0.14)]
+const SLEEVE_T := [Color(0.04, 0.05, 0.03), Color(0.1, 0.13, 0.07), Color(0.16, 0.2, 0.11), Color(0.23, 0.28, 0.16), Color(0.3, 0.36, 0.21)]
+const METAL_T := [Color(0.08, 0.08, 0.08), Color(0.3, 0.29, 0.26), Color(0.48, 0.46, 0.4), Color(0.66, 0.63, 0.55), Color(0.85, 0.82, 0.72)]
+const HAND_LIGHT := Vector3(-0.55, -0.65, 0.52)
 
 
-static func _finger(p: Painter, pts: PackedVector2Array, r: float, col: Color) -> void:
-	## Gloved finger: phalanges as tapered capsules with knuckle joints and creases.
-	for i in pts.size() - 1:
-		var t := float(i) / float(maxi(pts.size() - 1, 1))
-		p.capsule(pts[i], pts[i + 1], r * (1.0 - t * 0.12), r * (0.9 - t * 0.12), col)
-	for i in range(1, pts.size() - 1):
-		var j := pts[i]
-		p.ball(j.x, j.y, r * 0.95, r * 0.9, col.lightened(0.05))
-		var d := (pts[i + 1] - pts[i - 1]).normalized()
-		var n := Vector2(-d.y, d.x)
-		p.line(j + n * r * 0.6, j - n * r * 0.6, col.darkened(0.5), 1.0)
+static func _tone(tones: Array, i: float) -> Color:
+	if i < 0.12:
+		return tones[1]
+	if i < 0.5:
+		return tones[2]
+	if i < 0.83:
+		return tones[3]
+	return tones[4]
 
 
-static func _forearm(p: Painter, wrist: Vector2, f: Vector2) -> void:
-	## Cloth sleeve + laced leather bracer running from the wrist off-screen along f.
+static func _tcapsule(p: Painter, a: Vector2, b: Vector2, r: float, tones: Array) -> void:
+	## Clean banded capsule with a 1px outline (later shapes overwrite earlier ones,
+	## so their outline becomes the dark separation line).
+	var L := HAND_LIGHT.normalized()
+	var R := r + 1.0
+	var x0 := maxi(int(floor(minf(a.x, b.x) - R)), 0)
+	var x1 := mini(int(ceil(maxf(a.x, b.x) + R)), p.w - 1)
+	var y0 := maxi(int(floor(minf(a.y, b.y) - R)), 0)
+	var y1 := mini(int(ceil(maxf(a.y, b.y) + R)), p.h - 1)
+	var ab := b - a
+	var len2 := maxf(ab.length_squared(), 0.0001)
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var pp := Vector2(x + 0.5, y + 0.5)
+			var t := clampf((pp - a).dot(ab) / len2, 0.0, 1.0)
+			var d := pp - (a + ab * t)
+			var dl := d.length()
+			if dl > R:
+				continue
+			if dl > r:
+				p.img.set_pixel(x, y, tones[0])
+				continue
+			var nxy := d / r
+			var nz := sqrt(maxf(1.0 - nxy.length_squared(), 0.0))
+			p.img.set_pixel(x, y, _tone(tones, Vector3(nxy.x, nxy.y, nz).dot(L)))
+
+
+static func _tpoly(p: Painter, pts: PackedVector2Array, tones: Array, base_idx: int = 2) -> void:
+	## Flat plate: base tone, a light inner edge facing the light, a shadow inner edge opposite, outline.
+	var r := Rect2i(Vector2i(int(floor(pts[0].x)), int(floor(pts[0].y))), Vector2i.ZERO)
+	for v in pts:
+		r = r.expand(Vector2i(int(floor(v.x)), int(floor(v.y))))
+	r = r.grow(2)
+	var centroid := Vector2.ZERO
+	for v in pts:
+		centroid += v
+	centroid /= float(pts.size())
+	for y in range(maxi(r.position.y, 0), mini(r.end.y, p.h)):
+		for x in range(maxi(r.position.x, 0), mini(r.end.x, p.w)):
+			if Geometry2D.is_point_in_polygon(Vector2(x + 0.5, y + 0.5), pts):
+				p.img.set_pixel(x, y, tones[base_idx])
+	var light2 := Vector2(-0.6, -0.8)
+	for i in pts.size():
+		var a := pts[i]
+		var b := pts[(i + 1) % pts.size()]
+		var e := (b - a).normalized()
+		var n := Vector2(-e.y, e.x)
+		if n.dot((a + b) * 0.5 - centroid) < 0.0:
+			n = -n
+		var facing := n.dot(light2)
+		if facing > 0.3:
+			p.line(a - n * 1.5 + e * 1.5, b - n * 1.5 - e * 1.5, tones[3], 1.0)
+		elif facing < -0.3:
+			p.line(a - n * 1.5 + e * 1.5, b - n * 1.5 - e * 1.5, tones[1], 1.0)
+	for i in pts.size():
+		p.line(pts[i], pts[(i + 1) % pts.size()], tones[0], 1.0)
+
+
+static func _knuckle_glint(p: Painter, at: Vector2, along: Vector2) -> void:
+	p.line(at - along * 1.5, at + along * 1.5, GLOVE_T[4], 1.0)
+
+
+static func _forearm(p: Painter, wrist: Vector2, f: Vector2, r0: float) -> void:
+	## Sleeve + leather bracer with two strapped buckles, running off-screen along f.
 	var n := Vector2(-f.y, f.x)
-	var far := wrist + f * 260.0
-	p.capsule(far, wrist + f * 74.0, 38.0, 25.0, SLEEVE)
-	for i in 4:
-		var a := wrist + f * (88.0 + i * 22.0) + n * (-16.0 + i * 10.0)
-		p.line(a, a + f * 40.0 + n * 4.0, SLEEVE.darkened(0.45), 1.2)
-	p.capsule(wrist + f * 92.0, wrist + f * 6.0, 20.0, 15.5, BRACER)
-	for i in 3:
-		var c := wrist + f * (24.0 + i * 23.0)
-		var hw := 16.0 + i * 1.4
-		p.capsule(c - n * hw, c + n * hw, 2.2, 2.2, BRACER.darkened(0.45))
-		p.spec = 0.8
-		p.flat_poly(PackedVector2Array([c + n * (hw - 6.5) - f * 3.0, c + n * (hw - 2.0) - f * 3.0, c + n * (hw - 2.0) + f * 3.0, c + n * (hw - 6.5) + f * 3.0]), Color(0.42, 0.38, 0.3), Vector3(-0.3, -0.5, 1))
-		p.spec = 0.0
-	for i in 12:
-		var s := wrist + f * (10.0 + i * 7.0) + n * 12.5
-		p.line(s, s + f * 3.0, STITCH, 1.0)
-	# flared glove cuff
-	p.capsule(wrist + f * 3.0 - n * 12.5, wrist + f * 3.0 + n * 12.5, 4.5, 4.5, GLOVE.lightened(0.04))
-	p.line(wrist + f * 6.0 - n * 14.5, wrist + f * 6.0 + n * 14.5, GLOVE.darkened(0.5), 1.0)
+	_tcapsule(p, wrist + f * 260.0, wrist + f * 66.0, r0 + 10.0, SLEEVE_T)
+	_tcapsule(p, wrist + f * 74.0, wrist + f * 3.0, r0 + 3.0, BRACER_T)
+	for s in [22.0, 48.0]:
+		var c: Vector2 = wrist + f * float(s)
+		var hw := r0 + 2.5 + float(s) * 0.03
+		_tcapsule(p, c - n * hw, c + n * hw, 2.4, STRAP_T)
+		_tcapsule(p, c + n * (hw * 0.45) - f * 0.5, c + n * (hw * 0.45) + f * 0.5, 2.6, METAL_T)
 
 
 static func _bow_fist(p: Painter, grip: Vector2, axis: Vector2, left: Vector2) -> void:
-	## Left fist closed around the leather grip; knuckles and thumb over the grip.
+	## Left fist on the grip: back of the hand as a tapered plate, four parallel finger bands
+	## wrapped around the grip toward the viewer, the thumb laid over the top band.
+	var rdir := -left
 	var f := Vector2(-0.48, 1.0).normalized()
-	var wrist := grip + left * 20.0 + f * 48.0
-	_forearm(p, wrist, f)
-	# back of the hand (wider than the wrist), seam stitching
-	var hand_c := grip + left * 17.0 + f * 14.0
-	p.capsule(wrist, hand_c, 17.5, 21.0, GLOVE)
-	p.ball(hand_c.x, hand_c.y, 21.0, 19.0, GLOVE)
-	for i in 7:
-		var s := wrist.lerp(hand_c, float(i) / 6.0) + left * 11.0
-		p.tput(s.x, s.y, STITCH)
-	# four fingers wrapped across the front of the grip (pinky lowest)
-	var sizes := [5.0, 5.8, 6.2, 6.0]
-	for j in 4:
-		var k := grip + left * 12.0 + axis * (-16.0 + j * 10.5)
-		var r: float = sizes[j]
-		var col := GLOVE.lightened(0.025 * j)
-		var pts := PackedVector2Array([k + left * 2.0, k - left * 9.0 + f * 0.5, k - left * 15.0 + f * 5.0, k - left * 13.5 + f * 11.0])
-		_finger(p, pts, r, col)
-		p.ball(k.x + left.x * 1.5, k.y + left.y * 1.5, r * 1.12, r * 1.02, GLOVE.lightened(0.1))
-		p.line(k + axis * (r + 0.5) + left * 3.0, k + axis * (r + 0.5) - left * 14.0, GLOVE.darkened(0.6), 1.0)
-	# thumb resting over the index finger, pointing forward
-	var tb := grip + left * 21.0 + axis * 25.0
-	var tm := grip + left * 7.0 + axis * 28.5
-	var tt := grip - left * 8.0 + axis * 25.5
-	_finger(p, PackedVector2Array([tb, tm, tt]), 6.6, GLOVE.lightened(0.07))
-	p.ball(tt.x, tt.y, 5.2, 4.8, GLOVE.lightened(0.12))
+	var lens := [27.0, 25.5, 24.0, 21.0]
+	var centres: Array = []
+	for i in 4:
+		centres.append(grip + axis * (11.0 - i * 8.6))
+	var c0: Vector2 = centres[0]
+	var c3: Vector2 = centres[3]
+	var k_top := c0 - rdir * 12.0 + axis * 4.5
+	var k_bot := c3 - rdir * 12.0 - axis * 4.5
+	var w_top := k_top + f * 30.0 - rdir * 6.0
+	var w_bot := k_bot + f * 20.0 - rdir * 1.0
+	var wrist := (w_top + w_bot) * 0.5
+	_forearm(p, wrist, f, 13.0)
+	_tpoly(p, PackedVector2Array([k_top, k_bot, w_bot, w_top]), GLOVE_T)
+	# seam on the back of the hand
+	for i in 5:
+		var s := k_top.lerp(w_top, 0.2 + i * 0.15) + (k_bot - k_top).normalized() * 6.0
+		p.img.set_pixel(int(s.x), int(s.y), GLOVE_T[3])
+	# fingers: pinky first so each upper band's outline separates it from the one below
+	for i in range(3, -1, -1):
+		var c: Vector2 = centres[i]
+		var a := c - rdir * 12.0
+		var b := c + rdir * (float(lens[i]) - 12.0)
+		_tcapsule(p, a, b, 4.0, GLOVE_T)
+		_knuckle_glint(p, a + rdir * 3.0 + axis * 2.6, rdir)
+	# thumb: one band laid diagonally over the index band
+	var t0 := k_top + f * 13.0 - rdir * 2.0
+	var t1 := c0 + rdir * 5.0 + axis * 2.0
+	_tcapsule(p, t0, t1, 4.4, GLOVE_T)
+	_knuckle_glint(p, t1 - (t1 - t0).normalized() * 3.0 + axis * 2.8, (t1 - t0).normalized())
 
 
 static func _draw_hand(p: Painter, nock: Vector2, u: Vector2, s_up: Vector2, s_dn: Vector2) -> void:
-	## Right hand in a Mediterranean draw: index above the nock, middle + ring below, hooked on the string.
+	## Drawing hand, kept simple: three hooked finger tips crossing the string under the nock
+	## (parallel bands perpendicular to the string), back of the hand and wrist as clean planes,
+	## forearm leaving through the bottom-right edge.
 	var h := -u
-	var f := (h + Vector2(0.25, 0.35)).normalized()
-	var wrist := nock + h * 50.0 + Vector2(4, 8)
-	_forearm(p, wrist, f)
-	var hand_c := nock + h * 25.0
-	p.capsule(wrist, hand_c, 17.5, 20.0, GLOVE)
-	p.ball(hand_c.x, hand_c.y, 20.0, 18.5, GLOVE)
-	var side := Vector2(-h.y, h.x)
-	for i in 7:
-		var s := wrist.lerp(hand_c, float(i) / 6.0) - side * 10.0
-		p.tput(s.x, s.y, STITCH)
-	# thumb tucked down along the jaw, pinky curled into the palm
-	var tb := hand_c + s_dn * 13.0 + h * 8.0
-	_finger(p, PackedVector2Array([tb, tb + s_dn * 11.0 - h * 2.0, tb + s_dn * 18.0 - h * 7.0]), 6.3, GLOVE.lightened(0.05))
-	var pk := nock + s_dn * 29.0 + h * 11.0
-	_finger(p, PackedVector2Array([pk + h * 9.0, pk, pk - h * 3.5 + s_up * 3.5]), 4.6, GLOVE.darkened(0.03))
-	# three drawing fingers hooked on the string
-	var spots := [[s_up, 10.0, 5.8], [s_dn, 9.0, 6.1], [s_dn, 20.0, 5.6]]
-	for sp in spots:
-		var sd: Vector2 = sp[0]
-		var fp := nock + sd * float(sp[1])
-		var r: float = sp[2]
-		var k := fp + h * 18.0
-		_finger(p, PackedVector2Array([k, fp + h * 4.0, fp - h * 3.0, fp + h * 2.0 + sd * 4.0]), r, GLOVE.lightened(0.03))
-		p.ball(k.x, k.y, r * 1.12, r * 1.02, GLOVE.lightened(0.1))
-	# leather finger tab edge peeking under the fingers
-	p.line(nock + s_up * 4.0 - h * 2.0, nock + s_dn * 26.0 - h * 2.0, BRACER.darkened(0.3), 1.6)
+	var fd := Vector2(-s_dn.y, s_dn.x)
+	if fd.dot(h) < 0.0:
+		fd = -fd
+	var tips: Array = []
+	for j in 3:
+		tips.append(nock + s_dn * (5.5 + j * 8.6))
+	var t0: Vector2 = tips[0]
+	var t2: Vector2 = tips[2]
+	var f2 := (h + Vector2(0.15, 0.5)).normalized()
+	var k_top := t0 + fd * 15.0 - s_dn * 4.5
+	var k_bot := t2 + fd * 15.0 + s_dn * 4.5
+	var w_top := k_top + fd * 10.0 + f2 * 16.0
+	var w_bot := k_bot + fd * 2.0 + f2 * 12.0
+	var wrist := (w_top + w_bot) * 0.5
+	_forearm(p, wrist, f2, 12.0)
+	_tpoly(p, PackedVector2Array([k_top, w_top, w_bot, k_bot]), GLOVE_T)
+	for j in range(2, -1, -1):
+		var tp: Vector2 = tips[j]
+		_tcapsule(p, tp - fd * 3.0, tp + fd * 15.0, 4.0, GLOVE_T)
+		_knuckle_glint(p, tp + fd * 11.0 - s_dn * 2.6, fd)
 
 
 static func _released_hand(p: Painter, at: Vector2, u: Vector2) -> void:
-	## Open hand flicked back after the release.
-	var h := -u
-	var f := (h + Vector2(0.35, 0.5)).normalized()
-	var wrist := at + h * 42.0
-	_forearm(p, wrist, f)
-	p.capsule(wrist, at, 17.5, 20.0, GLOVE)
-	p.ball(at.x, at.y, 20.0, 18.0, GLOVE)
-	var dirs := [-0.6, -0.24, 0.1, 0.42]
-	var rs := [5.8, 6.1, 5.7, 4.8]
-	var lens := [26.0, 30.0, 27.0, 20.0]
+	## Open hand pulled back: four slightly fanned parallel finger bands, thumb aside.
+	var pu := Vector2(-u.y, u.x)
+	if pu.x < 0.0:
+		pu = -pu
+	var lens := [19.0, 23.0, 24.0, 21.0]
+	var knuckles: Array = []
 	for j in 4:
-		var d := u.rotated(float(dirs[j]))
-		var k := at + d * 13.0
-		var r: float = rs[j]
-		var L: float = lens[j]
-		var n := Vector2(-d.y, d.x)
-		_finger(p, PackedVector2Array([k, k + d * L * 0.45, k + d * L * 0.8 + n * 2.0, k + d * L + n * 4.5]), r, GLOVE.lightened(0.03))
-		p.ball(k.x, k.y, r * 1.12, r * 1.02, GLOVE.lightened(0.1))
-	var tb := at + u.rotated(1.2) * 13.0
-	var td := u.rotated(1.5)
-	_finger(p, PackedVector2Array([tb, tb + td * 12.0, tb + td * 21.0 + td.rotated(-0.5) * 2.5]), 6.3, GLOVE.lightened(0.05))
+		knuckles.append(at + pu * (-12.6 + j * 8.4) + u * 6.0)
+	var k0: Vector2 = knuckles[0]
+	var k3: Vector2 = knuckles[3]
+	var w0 := k0 - pu * 2.0 - u * 30.0
+	var w3 := k3 + pu * 3.0 - u * 26.0
+	var wrist := (w0 + w3) * 0.5
+	_forearm(p, wrist, (-u + Vector2(0.25, 0.35)).normalized(), 12.0)
+	_tpoly(p, PackedVector2Array([k0 - pu * 4.5, k3 + pu * 4.5, w3, w0]), GLOVE_T)
+	for j in 4:
+		var k: Vector2 = knuckles[j]
+		var d := u.rotated(-0.16 + j * 0.11)
+		_tcapsule(p, k, k + d * float(lens[j]), 4.0, GLOVE_T)
+		_knuckle_glint(p, k + d * 3.0 - pu * 2.6, d)
+	var tb := k0 - pu * 5.0 - u * 14.0
+	_tcapsule(p, tb, tb - pu * 15.0 + u * 7.0, 4.4, GLOVE_T)
 
 
 static func bow_frames() -> Image:

@@ -282,8 +282,18 @@ static func statue() -> Image:
 	p.ball(24, 36.5, 2.0, 2.0, stone)
 	p.ball(21, 45.5, 2.2, 2.0, stone)
 	p.ball(27, 45.5, 2.2, 2.0, stone)
-	# great helm
-	p.cyl_poly(PackedVector2Array([Vector2(18.5, 11), Vector2(29.5, 11), Vector2(30, 24), Vector2(18, 24)]), stone, 24, 6, -0.15)
+	# mail aventail + plate gorget seating the helm on the shoulders
+	p.cyl_poly(PackedVector2Array([Vector2(17.5, 19), Vector2(30.5, 19), Vector2(35, 31.5), Vector2(13, 31.5)]), stone.darkened(0.12), 24, 11, -0.4)
+	for my in range(21, 31, 2):
+		for mx in range(15, 34, 2):
+			if Geometry2D.is_point_in_polygon(Vector2(mx + (my % 4) * 0.5, my), PackedVector2Array([Vector2(17.5, 19), Vector2(30.5, 19), Vector2(35, 31.5), Vector2(13, 31.5)])):
+				p.tput(mx + (my % 4) * 0.5, my, stone.darkened(0.42))
+	p.cyl_poly(PackedVector2Array([Vector2(16, 25), Vector2(32, 25), Vector2(34.5, 29.5), Vector2(13.5, 29.5)]), stone, 24, 11, -0.6)
+	p.line(Vector2(15, 27.2), Vector2(33, 27.2), stone.darkened(0.45), 0.6)
+	p.line(Vector2(15.2, 27.9), Vector2(32.8, 27.9), stone.lightened(0.1), 0.5)
+	# great helm (its lower rim overlaps the gorget)
+	p.cyl_poly(PackedVector2Array([Vector2(18.5, 11), Vector2(29.5, 11), Vector2(30.2, 25.5), Vector2(17.8, 25.5)]), stone, 24, 6, -0.15)
+	p.line(Vector2(17.8, 25), Vector2(30.2, 25), stone.darkened(0.35), 0.6)
 	p.ball(24, 11, 5.6, 2.5, stone.lightened(0.05))
 	p.rect(19.5, 16, 9, 0.9, Color(0.05, 0.05, 0.05))
 	p.line(Vector2(24, 17), Vector2(24, 23.5), stone.darkened(0.4), 0.5)
