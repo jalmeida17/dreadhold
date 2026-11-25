@@ -8,6 +8,7 @@ const Boons := preload("res://scripts/data/boons.gd")
 const CommandSlot := preload("res://scripts/ui/widgets/command_slot.gd")
 const Minimap := preload("res://scripts/ui/widgets/minimap.gd")
 const NightDial := preload("res://scripts/ui/widgets/night_dial.gd")
+const ClassData := preload("res://scripts/data/classes.gd")
 
 const W := 1280
 const H := 720
@@ -64,6 +65,14 @@ var _boss_hit_t := 0.0
 var _boon_sig := ""
 var merchant_label: Label
 var prompt_label: Label
+## Duo: the ally's frame (top-left) and the tag floating over their head.
+var ally_root: Control
+var ally_name: Label
+var ally_bar: ProgressBar
+var ally_state: Label
+var ally_tag: Control
+var ally_tag_name: Label
+var ally_tag_fill: ColorRect
 
 
 func setup(p_player: Node, p_director: Node) -> void:
@@ -108,6 +117,8 @@ func setup(p_player: Node, p_director: Node) -> void:
 	_build_top(cls)
 	_build_console(cls)
 	_build_boss_plate()
+	if director.get("partner") != null:
+		_build_ally_frame()
 
 	banner_title = UiTheme.title("", 52, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	banner_title.position = Vector2(0, 196)
@@ -263,6 +274,90 @@ func _build_console(cls: String) -> void:
 			cmd_slots.append(s)
 
 
+func _build_ally_frame() -> void:
+	var ally: Node = director.partner
+	ally_root = PanelContainer.new()
+	ally_root.position = Vector2(8, 38)
+	ally_root.custom_minimum_size = Vector2(270, 0)
+	ally_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(ally_root)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ally_root.add_child(h)
+	var pic := TextureRect.new()
+	pic.custom_minimum_size = Vector2(48, 48)
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var ptex: Texture2D = load(ClassData.CLASSES[ally.class_id].portrait)
+	pic.texture = UiTheme.frame_tex(ptex, 0, maxi(1, int(round(float(ptex.get_width()) / float(ptex.get_height())))))
+	h.add_child(pic)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(v)
+	ally_name = UiTheme.title(str(ally.display_name).to_upper(), 17, Color(0.55, 0.85, 1.0))
+	v.add_child(ally_name)
+	ally_bar = UiTheme.bar(Vector2(186, 12), "hp")
+	v.add_child(ally_bar)
+	ally_state = UiTheme.label("", 14, UiTheme.CREAM)
+	v.add_child(ally_state)
+	# the boss plate makes room under the ally
+	boss_root.position = Vector2(8, 112)
+	ally_tag = Control.new()
+	ally_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(ally_tag)
+	ally_tag_name = UiTheme.label(str(ally.display_name), 15, Color(0.55, 0.85, 1.0), HORIZONTAL_ALIGNMENT_CENTER)
+	ally_tag_name.position = Vector2(-90, -24)
+	ally_tag_name.size = Vector2(180, 20)
+	ally_tag.add_child(ally_tag_name)
+	var back := ColorRect.new()
+	back.color = Color(0, 0, 0, 0.85)
+	back.position = Vector2(-33, -1)
+	back.size = Vector2(66, 7)
+	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ally_tag.add_child(back)
+	ally_tag_fill = ColorRect.new()
+	ally_tag_fill.color = Color(0.35, 0.85, 0.3)
+	ally_tag_fill.position = Vector2(-32, 0)
+	ally_tag_fill.size = Vector2(64, 5)
+	ally_tag_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ally_tag.add_child(ally_tag_fill)
+
+
+func _update_ally() -> void:
+	if ally_root == null:
+		return
+	var ally = director.get("partner")
+	if ally == null or not is_instance_valid(ally):
+		ally_root.visible = false
+		ally_tag.visible = false
+		return
+	var r: float = clampf(ally.hp / maxf(ally.max_hp, 1.0), 0.0, 1.0)
+	ally_bar.value = r * 100.0
+	ally_tag_fill.size.x = 64.0 * r
+	ally_tag_fill.color = Color(0.35, 0.85, 0.3) if r > 0.3 else Color(0.9, 0.25, 0.2)
+	if ally.downed:
+		ally_state.text = "DOWN - hold [%s] near them" % Game.key_label(KEY_F)
+		ally_state.add_theme_color_override("font_color", UiTheme.RED)
+	else:
+		ally_state.text = "%d / %d" % [int(ceil(ally.hp)), int(ally.max_hp)]
+		ally_state.add_theme_color_override("font_color", UiTheme.CREAM)
+	# name and health over their head (the world is drawn at half resolution)
+	var cam: Camera3D = player.camera
+	var p3: Vector3 = ally.global_position + Vector3(0, 2.35, 0)
+	var dist: float = player.global_position.distance_to(ally.global_position)
+	var visible_tag: bool = not cam.is_position_behind(p3) and dist > 2.6 and dist < 70.0
+	ally_tag.visible = visible_tag
+	if visible_tag:
+		var k := float(W) / float(director.world.size.x)
+		var sp: Vector2 = cam.unproject_position(p3) * k
+		ally_tag.position = Vector2(sp.x, clampf(sp.y, 110.0, 540.0)).round()
+		ally_tag_name.text = str(ally.display_name) + ("  -  DOWN" if ally.downed else "")
+		ally_tag_name.add_theme_color_override("font_color", UiTheme.RED if ally.downed else Color(0.55, 0.85, 1.0))
+
+
 func _build_boss_plate() -> void:
 	## Compact plate under the top bar, top-left: portrait, name, soul bar, 3 phylacteries.
 	boss_root = Control.new()
@@ -386,6 +481,7 @@ func _process(delta: float) -> void:
 		banner_title.modulate.a = a
 		banner_sub.modulate.a = a
 	_update_boss(delta)
+	_update_ally()
 	for c in feed.get_children():
 		var t := float(c.get_meta("t", 3.0)) - delta
 		c.set_meta("t", t)
@@ -436,13 +532,13 @@ func _update_night_labels() -> void:
 		foes_label.text = "Trade with the goblin  [%s]" % Game.key_label(KEY_F)
 	elif ph == 0:
 		night_label.text = "NIGHT %s" % UiTheme.roman(director.wave + 1)
-		foes_label.text = "begins in %d" % int(ceil(director.prep_left()))
+		foes_label.text = "begins in %d" % int(ceil(director.prep_left())) if director.prep_left() > 0.0 else "the champions gather"
 	elif ph == 4:
 		night_label.text = ""
 		foes_label.text = ""
 	else:
 		night_label.text = "NIGHT %s" % UiTheme.roman(maxi(director.wave, 1))
-		var left: int = director.queue.size() + director.alive_count
+		var left: int = director.foes_left()
 		foes_label.text = ("%d foes remain" % left) if ph != 2 else "Dawn approaches"
 
 

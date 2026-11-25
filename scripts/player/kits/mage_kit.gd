@@ -52,7 +52,9 @@ func primary() -> void:
 		p.owner_player = player
 		p.splash_radius = 2.3 * (1.0 + float(player.mods.splash))
 		p.splash_damage = 18.0
+		player.echo_shot("fireball", aim_origin(), dir * 28.0, p.splash_radius)
 	Sfx.play("fireball_cast", -3.0)
+	player.echo("cast")
 
 
 func secondary() -> bool:
@@ -69,6 +71,7 @@ func secondary() -> bool:
 		var pos: Vector3 = player.global_position + Vector3(cos(a), 0.4, sin(a)) * reach * 0.7
 		Fx.spawn(scene_root(), "frost", pos, 1.2, 10.0)
 	Sfx.play("frost_nova")
+	player.echo("frost_nova", Vector3.ZERO, Vector3.ZERO, reach)
 	player.power_flash = 1.0
 	return true
 
@@ -85,7 +88,9 @@ func utility() -> bool:
 	if dist < 1.0:
 		return false
 	Fx.spawn(scene_root(), "portal", player.global_position + Vector3(0, 1.0, 0), 1.8, 18.0)
+	var from_pos: Vector3 = player.global_position
 	player.global_position += dir * dist
+	player.echo("blink", from_pos, player.global_position)
 	Fx.spawn(scene_root(), "portal", player.global_position + Vector3(0, 1.0, 0), 1.8, 18.0)
 	player.invuln = 0.3
 	player.fov_kick = 18.0

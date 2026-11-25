@@ -26,13 +26,15 @@ var _mat: StandardMaterial3D
 var _falling: Sprite3D
 
 
-static func spawn(parent: Node, p_mode: String, pos: Vector3, p_style: String, p_damage: float, p_source: Node = null) -> Node3D:
+static func spawn(parent: Node, p_mode: String, pos: Vector3, p_style: String, p_damage: float, p_source: Node = null, params: Dictionary = {}) -> Node3D:
 	var h: Node3D = load(HazardScript).new()
 	h.mode = p_mode
 	h.style = p_style
 	h.damage = p_damage
 	h.source = p_source
 	h.color = {"fire": Color(1.0, 0.45, 0.15), "acid": Color(0.7, 1.0, 0.25), "frost": Color(0.55, 0.9, 1.0)}.get(p_style, Color(1, 1, 1))
+	for k in params:
+		h.set(k, params[k])
 	parent.add_child(h)
 	h.global_position = Vector3(pos.x, 0.05, pos.z)
 	return h

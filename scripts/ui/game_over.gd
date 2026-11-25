@@ -99,7 +99,10 @@ func open(p_director: Node, best: bool) -> void:
 	h.position = Vector2(0, 640)
 	h.size = Vector2(1280, 56)
 	root.add_child(h)
-	for item in [["RISE AGAIN", _retry], ["NEW CHAMPION", _change], ["MAIN MENU", _menu]]:
+	var items := [["RISE AGAIN", _retry], ["NEW CHAMPION", _change], ["MAIN MENU", _menu]]
+	if Game.net.duo():
+		items = [["MAIN MENU", _menu]]
+	for item in items:
 		var b := Button.new()
 		b.text = item[0]
 		b.custom_minimum_size = Vector2(250, 56)
@@ -262,4 +265,5 @@ func _change() -> void:
 
 func _menu() -> void:
 	Sfx.play("ui_confirm")
+	Game.net.leave()
 	Game.goto(Game.SCENE_MENU)

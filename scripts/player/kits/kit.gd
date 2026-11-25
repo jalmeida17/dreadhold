@@ -95,6 +95,17 @@ func on_damaged(_amount: float) -> void:
 	pass
 
 
+func net_pose() -> int:
+	## What the ally should see: 0 idle/moving, 1 wind-up, 2 strike, 3 big cast.
+	if anim in ["spin", "frost"]:
+		return 3
+	if weapon_frame == 1:
+		return 1
+	if anim != "" or weapon_frame >= 2:
+		return 2
+	return 0
+
+
 func on_kill(_enemy: Node) -> void:
 	pass
 

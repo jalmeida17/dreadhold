@@ -253,7 +253,8 @@ func _roll() -> void:
 
 
 func open_shop() -> void:
-	get_tree().paused = true
+	# solo: time stops while trading; in a duo vigil the world goes on
+	get_tree().paused = not Game.net.duo()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	quote_label.text = QUOTES[rng.randi_range(0, QUOTES.size() - 1)]
 	root.visible = true

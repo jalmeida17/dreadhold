@@ -24,6 +24,7 @@ var settings := {
 	"music": 0.55,
 	"sfx": 0.85,
 	"fullscreen": false,
+	"player_name": "",
 }
 var records := {}
 var theme: Theme
@@ -33,6 +34,9 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_input()
 	_ask_web_layout()
+	net = load("res://scripts/net/net.gd").new()
+	net.name = "Net"
+	get_tree().root.add_child.call_deferred(net)
 	_setup_buses()
 	_load_settings()
 	_load_records()
@@ -55,6 +59,8 @@ var test := {}
 var _clock := 0.0
 var _shot_done := false
 var _key_labels := {}
+## Duo session (scripts/net/net.gd), living at /root/Net on every machine.
+var net: Node
 
 
 func _parse_test_args() -> void:
@@ -70,6 +76,8 @@ func _parse_test_args() -> void:
 		menu_page = "classes"
 	if test.has("maps"):
 		menu_page = "maps"
+	if test.has("lobby"):
+		menu_page = "lobby"
 	if test.has("continue"):
 		continue_run.call_deferred()
 	if test.has("start"):

@@ -75,6 +75,7 @@ var pillar_tex := ""
 var ceiling_tex := "ceiling_wood"
 var flow := PackedInt32Array()
 var flow_target := Vector2i(-99, -99)
+var _flow_key := ""
 var torch_lights: Array = []
 var anim_sprites: Array = []
 var debris: Node3D
@@ -543,12 +544,26 @@ func has_los(a: Vector3, b: Vector3) -> bool:
 # ============================================================================= flow field
 
 func update_flow(target: Vector2i) -> void:
-	if target == flow_target or not walkable(target):
+	var one: Array[Vector2i] = [target]
+	update_flow_multi(one)
+
+
+func update_flow_multi(targets: Array[Vector2i]) -> void:
+	## Distance field toward the nearest of several champions (duo: both players).
+	var q: Array[Vector2i] = []
+	for t in targets:
+		if walkable(t) and not q.has(t):
+			q.append(t)
+	if q.is_empty():
 		return
-	flow_target = target
+	var key := str(q)
+	if key == _flow_key:
+		return
+	_flow_key = key
+	flow_target = q[0]
 	flow.fill(FAR)
-	var q: Array[Vector2i] = [target]
-	flow[target.y * W + target.x] = 0
+	for t in q:
+		flow[t.y * W + t.x] = 0
 	var head := 0
 	var dirs := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
 	while head < q.size():

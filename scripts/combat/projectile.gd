@@ -23,6 +23,8 @@ var life := 3.5
 var gravity := 0.0
 var crit := false
 var knockback := 2.0
+## Duo: a copy of a shot fired on the other machine. It flies and bursts, but harms no one.
+var cosmetic := false
 var _exclude: Array[RID] = []
 var _sprite: Sprite3D
 var _t := 0.0
@@ -126,6 +128,10 @@ func _physics_process(delta: float) -> void:
 		return
 	var col: Object = hit.collider
 	var point: Vector3 = hit.position
+	if cosmetic:
+		_impact_fx(point, hit.normal, col)
+		queue_free()
+		return
 	if from_player and col != null and col.has_method("hurt"):
 		var dealt := damage
 		if owner_player != null:
@@ -142,6 +148,12 @@ func _physics_process(delta: float) -> void:
 
 
 func _impact(point: Vector3, normal: Vector3, col: Object) -> void:
+	_impact_fx(point, normal, col)
+	_splash(point, col)
+	queue_free()
+
+
+func _impact_fx(point: Vector3, normal: Vector3, col: Object) -> void:
 	var scene := get_parent()
 	match kind:
 		"ice":
@@ -166,6 +178,9 @@ func _impact(point: Vector3, normal: Vector3, col: Object) -> void:
 			if not on_enemy:
 				Fx.spawn(scene, "dust", point + normal * 0.1, 0.6, 16.0)
 				Sfx.play_at("arrow_hit", point, -6.0)
+
+
+func _splash(point: Vector3, col: Object) -> void:
 	if splash_radius > 0.0 and splash_damage > 0.0:
 		if from_player:
 			for e in get_tree().get_nodes_in_group("enemies"):
@@ -181,4 +196,3 @@ func _impact(point: Vector3, normal: Vector3, col: Object) -> void:
 			var pl := get_tree().get_first_node_in_group("player")
 			if pl != null and pl != col and pl.global_position.distance_to(point) <= splash_radius:
 				pl.take_damage(splash_damage, point, "ranged", owner_enemy if is_instance_valid(owner_enemy) else null)
-	queue_free()

@@ -89,6 +89,11 @@ func _draw() -> void:
 		var gp := _to_map(gob.global_position).floor()
 		draw_rect(Rect2(gp - Vector2(4, 4), Vector2(8, 8)), Color(0, 0, 0))
 		draw_rect(Rect2(gp - Vector2(3, 3), Vector2(6, 6)), Color(1.0, 0.8, 0.3))
+	var ally = director.get("partner")
+	if ally != null and is_instance_valid(ally):
+		var ap := _to_map(ally.global_position).floor()
+		draw_rect(Rect2(ap - Vector2(4, 4), Vector2(8, 8)), Color(0, 0, 0))
+		draw_rect(Rect2(ap - Vector2(3, 3), Vector2(6, 6)), Color(0.4, 0.75, 1.0) if ally.alive else Color(1.0, 0.3, 0.25))
 	var pl: Node3D = director.player
 	if pl != null:
 		_pixel_arrow(_to_map(pl.global_position).floor(), pl.yaw)

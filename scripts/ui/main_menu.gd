@@ -18,6 +18,21 @@ var ui: Control
 var page_title: Control
 var page_classes: Control
 var page_maps: Control
+var page_lobby: Control
+## "solo" or "duo": where the champion page leads.
+var _mode := "solo"
+var _class_go: Button
+# duo hall widgets
+var _name_edit: LineEdit
+var _code_edit: LineEdit
+var _lobby_split: Control
+var _lobby_room: Control
+var _room_code: Label
+var _room_hint: Label
+var _room_players: VBoxContainer
+var _room_maps := {}
+var _lobby_status: Label
+var _lobby_go: Button
 var _map_cards := {}
 var _selected_map := "keep"
 var options_center: CenterContainer
@@ -58,10 +73,17 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.music("music_menu")
 	Sfx.ambience("amb_keep")
+	if Game.test.has("log"):
+		print("[menu] main menu")
+	Game.net.lobby_changed.connect(_refresh_lobby)
+	Game.net.status.connect(_on_net_status)
 	if Game.menu_page == "classes":
 		_show_classes()
 	elif Game.menu_page == "maps":
 		_show_maps()
+	elif Game.menu_page == "lobby":
+		_mode = "duo"
+		_show_lobby()
 	Game.menu_page = "title"
 
 
@@ -81,6 +103,9 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if page_lobby.visible and event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE:
+		_leave_lobby()
+		return
 	if page_maps.visible and event is InputEventKey and event.pressed and not event.echo:
 		var keys := [KEY_1, KEY_2, KEY_3, KEY_4]
 		var idx := keys.find(event.physical_keycode)
@@ -106,7 +131,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_DOWN:
 				_select(ClassData.ORDER[(ClassData.ORDER.find(_selected) + 1) % 3])
 			KEY_ENTER, KEY_KP_ENTER:
-				_show_maps()
+				_after_class()
 			KEY_ESCAPE:
 				_show_title()
 
@@ -151,14 +176,17 @@ func _build_ui() -> void:
 		var summary := UiTheme.label("%s  -  %s
 Dawn after night %s  -  %d gold" % [cname, mname, UiTheme.roman(int(save.get("wave", 1))), int(pl.get("gold", 0))], 15, Color(0.8, 0.75, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
 		v.add_child(summary)
-	_menu_button(v, "SURVIVAL" if save.is_empty() else "NEW VIGIL", _show_classes)
-	var online := _menu_button(v, "ONLINE", func(): pass)
-	online.disabled = true
-	online.tooltip_text = "Online battles - coming soon"
+	_menu_button(v, "SURVIVAL" if save.is_empty() else "NEW VIGIL", func():
+		_mode = "solo"
+		_show_classes())
+	var duo := _menu_button(v, "DUO", func():
+		_mode = "duo"
+		_show_classes())
+	duo.tooltip_text = "Survive the nights with an ally, online"
 	_menu_button(v, "OPTIONS", _show_options)
 	if not OS.has_feature("web"):  # a browser tab is closed, not quit
 		_menu_button(v, "QUIT", func(): get_tree().quit())
-	v.add_child(UiTheme.label("Online battles are coming soon", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UiTheme.label("Duo: two champions, online", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
 	var ver := UiTheme.label("v%s" % Game.VERSION, 16, UiTheme.GREY)
 	ver.position = Vector2(16, 690)
 	page_title.add_child(ver)
@@ -169,6 +197,7 @@ Dawn after night %s  -  %d gold" % [cname, mname, UiTheme.roman(int(save.get("wa
 
 	_build_class_page()
 	_build_map_page()
+	_build_lobby_page()
 
 	options_center = CenterContainer.new()
 	options_center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -193,34 +222,37 @@ func _menu_button(parent: Control, text: String, cb: Callable) -> Button:
 	return b
 
 
-func _show_title() -> void:
-	page_title.visible = true
-	page_classes.visible = false
-	page_maps.visible = false
+func _show_page(p: Control) -> void:
+	for page in [page_title, page_classes, page_maps, page_lobby]:
+		page.visible = page == p
 	options.visible = false
+
+
+func _show_title() -> void:
+	_show_page(page_title)
 
 
 func _show_classes() -> void:
-	page_title.visible = false
-	page_classes.visible = true
-	page_maps.visible = false
-	options.visible = false
+	_show_page(page_classes)
+	_class_go.text = "TO THE DUO HALL" if _mode == "duo" else "CHOOSE BATTLEFIELD"
 	_select(_selected, true)
 
 
+func _after_class() -> void:
+	if _mode == "duo":
+		_show_lobby()
+	else:
+		_show_maps()
+
+
 func _show_options() -> void:
-	page_title.visible = false
-	page_classes.visible = false
-	page_maps.visible = false
+	_show_page(null)
 	options.visible = true
 
 
 func _show_maps() -> void:
 	Sfx.play("ui_confirm", -4.0)
-	page_title.visible = false
-	page_classes.visible = false
-	page_maps.visible = true
-	options.visible = false
+	_show_page(page_maps)
 	_select_map(Game.selected_map, true)
 
 
@@ -268,9 +300,10 @@ func _build_class_page() -> void:
 	go.position = Vector2(880, 648)
 	go.custom_minimum_size = Vector2(340, 64)
 	go.add_theme_font_size_override("font_size", 26)
-	go.pressed.connect(_show_maps)
+	go.pressed.connect(_after_class)
 	go.mouse_entered.connect(func(): Sfx.play("ui_hover", -8.0))
 	page_classes.add_child(go)
+	_class_go = go
 
 
 func _class_plate(id: String, index: int) -> Button:
@@ -316,7 +349,7 @@ func _class_plate(id: String, index: int) -> Button:
 	btn.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventMouseButton and ev.double_click:
 			_select(id)
-			_show_maps())
+			_after_class())
 	_plates[id] = btn
 	_plate_pics[id] = [pic, ptex, nfr]
 	return btn
@@ -600,3 +633,268 @@ func _start_new() -> void:
 	Game.selected_map = _selected_map
 	Game.selected_class = _selected
 	Game.goto(Game.SCENE_SURVIVAL)
+
+
+# ======================================================================= duo hall
+
+func _edit_style() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.05, 0.045, 0.04, 0.95)
+	sb.border_color = UiTheme.GOLD_DARK
+	sb.set_border_width_all(2)
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	return sb
+
+
+func _line_edit(placeholder: String, size: int, max_len: int) -> LineEdit:
+	var e := LineEdit.new()
+	e.placeholder_text = placeholder
+	e.max_length = max_len
+	e.add_theme_font_size_override("font_size", size)
+	e.add_theme_color_override("font_color", UiTheme.GOLD)
+	e.add_theme_color_override("font_placeholder_color", Color(0.5, 0.47, 0.4))
+	e.add_theme_stylebox_override("normal", _edit_style())
+	var focus := _edit_style()
+	focus.border_color = UiTheme.GOLD
+	e.add_theme_stylebox_override("focus", focus)
+	e.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return e
+
+
+func _hall_panel(pos: Vector2, size: Vector2, parent: Control) -> VBoxContainer:
+	var p := PanelContainer.new()
+	p.position = pos
+	p.custom_minimum_size = size
+	p.size = size
+	parent.add_child(p)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	p.add_child(v)
+	return v
+
+
+func _build_lobby_page() -> void:
+	page_lobby = Control.new()
+	page_lobby.set_anchors_preset(Control.PRESET_FULL_RECT)
+	page_lobby.visible = false
+	page_lobby.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(page_lobby)
+	var title := UiTheme.title("THE DUO HALL", 44, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	title.position = Vector2(0, 18)
+	title.size = Vector2(1280, 56)
+	page_lobby.add_child(title)
+	var hint := UiTheme.label("Two champions, one vigil. Nothing is saved: the vigil ends when both have fallen.", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
+	hint.position = Vector2(0, 72)
+	hint.size = Vector2(1280, 22)
+	page_lobby.add_child(hint)
+	var name_row := HBoxContainer.new()
+	name_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	name_row.add_theme_constant_override("separation", 14)
+	name_row.position = Vector2(0, 108)
+	name_row.size = Vector2(1280, 48)
+	page_lobby.add_child(name_row)
+	name_row.add_child(UiTheme.title("YOUR NAME", 20, UiTheme.CREAM))
+	_name_edit = _line_edit("Champion", 22, 16)
+	_name_edit.custom_minimum_size = Vector2(300, 44)
+	_name_edit.text = str(Game.settings.get("player_name", ""))
+	_name_edit.text_changed.connect(func(t: String):
+		Game.settings.player_name = t.strip_edges()
+		Game.save_settings())
+	name_row.add_child(_name_edit)
+
+	# ---- before a room exists: host or join
+	_lobby_split = Control.new()
+	_lobby_split.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_lobby_split.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	page_lobby.add_child(_lobby_split)
+	var hv := _hall_panel(Vector2(130, 190), Vector2(490, 330), _lobby_split)
+	hv.add_child(UiTheme.title("HOST A VIGIL", 30, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var hd := UiTheme.label("Open a room, then give its four-letter code to your ally. You choose the battlefield.", 17, UiTheme.CREAM, HORIZONTAL_ALIGNMENT_CENTER)
+	hd.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hd.custom_minimum_size = Vector2(420, 0)
+	hv.add_child(hd)
+	var host_btn := Button.new()
+	host_btn.text = "OPEN A ROOM"
+	host_btn.custom_minimum_size = Vector2(300, 60)
+	host_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	host_btn.add_theme_font_size_override("font_size", 24)
+	host_btn.pressed.connect(func():
+		Sfx.play("ui_confirm")
+		Game.net.host(_selected, Game.selected_map))
+	hv.add_child(host_btn)
+	var jv := _hall_panel(Vector2(660, 190), Vector2(490, 330), _lobby_split)
+	jv.add_child(UiTheme.title("JOIN AN ALLY", 30, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var jd := UiTheme.label("Enter the code your ally gave you.", 17, UiTheme.CREAM, HORIZONTAL_ALIGNMENT_CENTER)
+	jv.add_child(jd)
+	_code_edit = _line_edit("CODE", 40, 4)
+	_code_edit.custom_minimum_size = Vector2(220, 64)
+	_code_edit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_code_edit.text_changed.connect(func(t: String):
+		var clean := ""
+		for ch in t.to_upper():
+			if ch >= "A" and ch <= "Z":
+				clean += ch
+		if clean != t:
+			_code_edit.text = clean
+			_code_edit.caret_column = clean.length())
+	_code_edit.text_submitted.connect(func(_t: String): _join())
+	jv.add_child(_code_edit)
+	var join_btn := Button.new()
+	join_btn.text = "JOIN"
+	join_btn.custom_minimum_size = Vector2(300, 60)
+	join_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	join_btn.add_theme_font_size_override("font_size", 24)
+	join_btn.pressed.connect(_join)
+	jv.add_child(join_btn)
+
+	# ---- inside a room
+	_lobby_room = Control.new()
+	_lobby_room.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_lobby_room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lobby_room.visible = false
+	page_lobby.add_child(_lobby_room)
+	var rv := _hall_panel(Vector2(190, 172), Vector2(900, 400), _lobby_room)
+	rv.add_theme_constant_override("separation", 10)
+	var code_row := HBoxContainer.new()
+	code_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	code_row.add_theme_constant_override("separation", 22)
+	rv.add_child(code_row)
+	code_row.add_child(UiTheme.title("ROOM CODE", 24, UiTheme.CREAM))
+	_room_code = UiTheme.title("----", 56, UiTheme.GOLD)
+	code_row.add_child(_room_code)
+	_room_hint = UiTheme.label("", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
+	rv.add_child(_room_hint)
+	_room_players = VBoxContainer.new()
+	_room_players.add_theme_constant_override("separation", 8)
+	rv.add_child(_room_players)
+	rv.add_child(UiTheme.title("BATTLEFIELD", 20, UiTheme.CREAM, HORIZONTAL_ALIGNMENT_CENTER))
+	var maps_row := HBoxContainer.new()
+	maps_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	maps_row.add_theme_constant_override("separation", 10)
+	rv.add_child(maps_row)
+	for id in Maps.ORDER:
+		var b := Button.new()
+		b.text = str(Maps.MAPS[id].name)
+		b.custom_minimum_size = Vector2(205, 46)
+		b.add_theme_font_size_override("font_size", 16)
+		b.toggle_mode = true
+		b.pressed.connect(func():
+			Sfx.play("ui_click")
+			Game.net.set_map(id))
+		maps_row.add_child(b)
+		_room_maps[id] = b
+
+	_lobby_status = UiTheme.label("", 18, UiTheme.CREAM, HORIZONTAL_ALIGNMENT_CENTER)
+	_lobby_status.position = Vector2(0, 594)
+	_lobby_status.size = Vector2(1280, 26)
+	page_lobby.add_child(_lobby_status)
+	var back := Button.new()
+	back.text = "BACK"
+	back.position = Vector2(60, 650)
+	back.custom_minimum_size = Vector2(220, 58)
+	back.add_theme_font_size_override("font_size", 24)
+	back.pressed.connect(func():
+		Sfx.play("ui_click")
+		_leave_lobby())
+	page_lobby.add_child(back)
+	_lobby_go = Button.new()
+	_lobby_go.text = "BEGIN THE VIGIL"
+	_lobby_go.position = Vector2(880, 648)
+	_lobby_go.custom_minimum_size = Vector2(340, 64)
+	_lobby_go.add_theme_font_size_override("font_size", 26)
+	_lobby_go.pressed.connect(func():
+		Sfx.play("ui_confirm")
+		Game.net.start_game())
+	page_lobby.add_child(_lobby_go)
+
+
+func _show_lobby() -> void:
+	Sfx.play("ui_confirm", -4.0)
+	_show_page(page_lobby)
+	_lobby_status.text = ""
+	_refresh_lobby()
+	if _name_edit.text == "":
+		_name_edit.grab_focus()
+
+
+func _join() -> void:
+	Sfx.play("ui_confirm")
+	Game.net.join(_code_edit.text, _selected)
+
+
+func _leave_lobby() -> void:
+	Game.net.leave()
+	_lobby_status.text = ""
+	_show_classes()
+
+
+func _on_net_status(text: String, is_error: bool) -> void:
+	if _lobby_status == null:
+		return
+	_lobby_status.text = text
+	_lobby_status.add_theme_color_override("font_color", UiTheme.RED if is_error else UiTheme.CREAM)
+	if is_error:
+		Sfx.play("ui_click", -4.0)
+
+
+func _refresh_lobby() -> void:
+	if page_lobby == null:
+		return
+	var net: Node = Game.net
+	var in_room: bool = net.connected() and net.room_code != ""
+	_lobby_split.visible = not in_room
+	_lobby_room.visible = in_room
+	_lobby_go.visible = in_room
+	if not in_room:
+		return
+	var host: bool = net.is_host()
+	_room_code.text = " ".join(str(net.room_code).split(""))
+	_room_hint.text = "Give this code to your ally" if host else "You joined this vigil"
+	for c in _room_players.get_children():
+		c.queue_free()
+	var ids: Array = net.players.keys()
+	ids.sort()
+	for i in 2:
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 14)
+		_room_players.add_child(row)
+		if i < ids.size():
+			var p: Dictionary = net.players[ids[i]]
+			var cdef: Dictionary = ClassData.CLASSES.get(str(p.get("class", "warrior")), ClassData.CLASSES["warrior"])
+			var pic := TextureRect.new()
+			pic.custom_minimum_size = Vector2(44, 44)
+			pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			var ptex: Texture2D = load(cdef.portrait)
+			pic.texture = UiTheme.frame_tex(ptex, 0, maxi(1, int(round(float(ptex.get_width()) / float(ptex.get_height())))))
+			row.add_child(pic)
+			var who := str(p.get("name", "Champion"))
+			if int(ids[i]) == net.my_id():
+				who += "  (you)"
+			var nl := UiTheme.title(who, 22, UiTheme.GOLD if int(ids[i]) == 1 else Color(0.55, 0.85, 1.0))
+			nl.custom_minimum_size = Vector2(300, 0)
+			row.add_child(nl)
+			var cl := UiTheme.label(str(cdef.name) + ("  -  host" if int(ids[i]) == 1 else ""), 18, UiTheme.CREAM)
+			cl.custom_minimum_size = Vector2(300, 0)
+			row.add_child(cl)
+		else:
+			row.add_child(UiTheme.label("Waiting for an ally...", 20, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
+	for id in _room_maps:
+		var b: Button = _room_maps[id]
+		var chosen: bool = id == net.map_id
+		b.button_pressed = chosen
+		b.disabled = not host
+		b.modulate = Color(1, 1, 1) if chosen else Color(0.55, 0.55, 0.55)
+		b.text = ("> %s <" if chosen else "%s") % str(Maps.MAPS[id].name)
+	if host:
+		_lobby_go.text = "BEGIN THE VIGIL"
+		_lobby_go.disabled = not net.can_start()
+	else:
+		_lobby_go.text = "THE HOST BEGINS"
+		_lobby_go.disabled = true

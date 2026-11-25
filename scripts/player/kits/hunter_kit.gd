@@ -34,6 +34,7 @@ func _shoot(dir: Vector3, dmg: float) -> void:
 	p.owner_player = player
 	p.pierce = int(player.mods.pierce)
 	p.knockback = 1.5
+	player.echo_shot("arrow", aim_origin(), dir * 58.0)
 
 
 func primary() -> void:
@@ -42,6 +43,7 @@ func primary() -> void:
 	kick = Vector2(6, 8)
 	_shoot(player.forward(), 27.0)
 	Sfx.play("bow_shoot", -2.0, 0.1)
+	player.echo("bow")
 
 
 func secondary() -> bool:
@@ -54,6 +56,7 @@ func secondary() -> bool:
 	kick = Vector2(10, 14)
 	player.power_flash = 1.0
 	Sfx.play("volley")
+	player.echo("volley")
 	return true
 
 
@@ -67,4 +70,5 @@ func utility() -> bool:
 	player.invuln = 0.3
 	player.fov_kick = 10.0
 	Sfx.play("dash")
+	player.echo("dash")
 	return true

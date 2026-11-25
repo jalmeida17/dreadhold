@@ -56,6 +56,7 @@ func primary() -> void:
 	_swing_hit_done = false
 	kick = Vector2(-10, 6)
 	Sfx.play("swing", -2.0, 0.12)
+	player.echo("swing")
 
 
 func _cleave_hit() -> void:
@@ -92,6 +93,7 @@ func secondary() -> bool:
 		var dmg: float = player.compute_damage(52.0, e)
 		e.hurt(dmg, player.global_position, 8.0, player)
 	Sfx.play("spin")
+	player.echo("spin", Vector3.ZERO, Vector3.ZERO, reach)
 	Fx.ring(scene_root(), player.global_position, reach, Color(1.0, 0.85, 0.7, 0.9), 0.3)
 	player.power_flash = 1.0
 	player.shake = 0.5
@@ -114,6 +116,7 @@ func utility() -> bool:
 	resource += 15.0
 	_out_of_combat = 0.0
 	Sfx.play("charge")
+	player.echo("charge")
 	cooldowns["utility"] = 0.0
 	base_cooldowns["utility"] = 7.0 - 2.0 * float(player.mods.charge_bonus)
 	return true

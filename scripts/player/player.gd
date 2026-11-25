@@ -3,6 +3,8 @@ extends CharacterBody3D
 ## Class abilities live in a "kit" child node (scripts/player/kits/*).
 
 signal died
+## Duo only: the champion is down (not dead) and can be revived by the ally or at dawn.
+signal downed_changed(is_down: bool)
 signal boon_applied(id: String)
 
 const ClassData := preload("res://scripts/data/classes.gd")
@@ -47,6 +49,9 @@ var gold := 0
 var kills := 0
 var undying := 0
 var alive := true
+## Duo vigil: falling puts the champion down instead of ending the run.
+var duo := false
+var downed := false
 
 var yaw := 0.0
 var pitch := 0.0
@@ -72,6 +77,8 @@ var has_torch := false
 var _torch_light: OmniLight3D
 var weapon_tier := 0
 var _death_t := 0.0
+## Test autopilot only: where the bot wants to walk.
+var bot_wish := Vector3.ZERO
 
 
 func setup(p_class: String, p_arena: Node3D, p_director: Node) -> void:
@@ -163,6 +170,7 @@ func equip_torch() -> void:
 	_torch_light.omni_attenuation = 1.1
 	_torch_light.position = Vector3(-0.45, -0.25, -0.5)
 	camera.add_child(_torch_light)
+	echo("torch")
 	Sfx.play("fireball_cast", -4.0)
 
 
@@ -203,6 +211,8 @@ func _physics_process(delta: float) -> void:
 	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back") if _controls_active() else Vector2.ZERO
 	var wish := (transform.basis * Vector3(input.x, 0, input.y))
 	wish.y = 0
+	if not _controls_active() and Game.test.has("bot"):
+		wish = bot_wish
 	if wish.length() > 1.0:
 		wish = wish.normalized()
 	if dash_time > 0.0:
@@ -272,7 +282,15 @@ func _process(delta: float) -> void:
 
 
 func _bot(_delta: float) -> void:
-	## Test autopilot: aim at the nearest enemy and attack.
+	## Test autopilot: aim at the nearest enemy and attack; in duo, run to a fallen ally.
+	bot_wish = Vector3.ZERO
+	var ally = director.get("partner")
+	if ally != null and is_instance_valid(ally) and ally.downed:
+		var to_ally: Vector3 = ally.global_position - global_position
+		to_ally.y = 0.0
+		if to_ally.length() > 1.4:
+			bot_wish = to_ally.normalized()
+		return
 	var best: Node3D = null
 	var bd := 1e9
 	for e in get_tree().get_nodes_in_group("enemies"):
@@ -351,7 +369,10 @@ func take_damage(amount: float, from_pos: Vector3 = Vector3.INF, kind: String = 
 			director.show_message("UNDYING OATH!", Color(1.0, 0.6, 0.15))
 			return
 		hp = 0.0
-		_die()
+		if duo:
+			_go_down()
+		else:
+			_die()
 
 
 func heal(amount: float, flash: bool = true) -> void:
@@ -369,6 +390,41 @@ func _die() -> void:
 	died.emit()
 
 
+func _go_down() -> void:
+	alive = false
+	downed = true
+	dash_time = 0.0
+	potion_heal_left = 0.0
+	Sfx.play("player_death")
+	shake = 1.0
+	downed_changed.emit(true)
+
+
+func revive(ratio: float = 0.5) -> void:
+	## Back on your feet (an ally's help, or the dawn).
+	if not downed:
+		return
+	downed = false
+	alive = true
+	hp = maxf(max_hp * ratio, 1.0)
+	invuln = 3.0
+	heal_flash = 1.0
+	camera.rotation.z = 0.0
+	Sfx.play("boon_select")
+	downed_changed.emit(false)
+
+
+func echo(kind: String, a: Vector3 = Vector3.ZERO, b: Vector3 = Vector3.ZERO, r: float = 0.0) -> void:
+	## Duo: let the ally see and hear what this champion just did.
+	if duo:
+		Game.net.send("p_fx", [kind, a, b, r])
+
+
+func echo_shot(kind: String, origin: Vector3, vel: Vector3, splash: float = 0.0) -> void:
+	if duo:
+		Game.net.send("p_shot", [kind, origin, vel, splash])
+
+
 func drink_potion() -> void:
 	if potions <= 0 or hp >= max_hp:
 		return
@@ -377,6 +433,7 @@ func drink_potion() -> void:
 	potion_heal_left += max_hp * 0.5
 	heal_flash = 1.0
 	Sfx.play("potion_drink")
+	echo("potion")
 
 
 func collect(kind: String, amount: int) -> bool:

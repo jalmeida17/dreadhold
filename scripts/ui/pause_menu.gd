@@ -31,12 +31,19 @@ func _ready() -> void:
 	v.custom_minimum_size = Vector2(380, 0)
 	menu.add_child(v)
 	v.add_child(UiTheme.title("PAUSED", 44, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
-	v.add_child(UiTheme.label("The dead wait patiently.", 18, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
-	var note := UiTheme.label("Your vigil is saved at every dawn. Quitting resumes it from the last dawn.", 15, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
+	var duo: bool = Game.net.duo()
+	v.add_child(UiTheme.label("The dead do not wait: your ally fights on." if duo else "The dead wait patiently.", 18, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
+	var note_text := "Your vigil is saved at every dawn. Quitting resumes it from the last dawn."
+	if duo:
+		note_text = "Duo vigils are never saved. Leaving ends the vigil for both of you." if Game.net.is_host() else "Duo vigils are never saved. If you leave, your ally fights on alone."
+	var note := UiTheme.label(note_text, 15, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.custom_minimum_size = Vector2(380, 0)
 	v.add_child(note)
-	for item in [["RETURN TO GAME", close], ["OPTIONS", _show_options], ["QUIT TO MENU", _quit], ["ABANDON VIGIL", _abandon]]:
+	var items := [["RETURN TO GAME", close], ["OPTIONS", _show_options], ["QUIT TO MENU", _quit], ["ABANDON VIGIL", _abandon]]
+	if duo:
+		items = [["RETURN TO GAME", close], ["OPTIONS", _show_options], ["LEAVE THE VIGIL", _quit]]
+	for item in items:
 		var b := Button.new()
 		b.text = item[0]
 		b.custom_minimum_size = Vector2(380, 56)
@@ -59,7 +66,8 @@ func open() -> void:
 	root.visible = true
 	menu.visible = true
 	options.visible = false
-	get_tree().paused = true
+	# a duo vigil goes on while one champion looks at the menu
+	get_tree().paused = not Game.net.duo()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Sfx.play("ui_click")
 
@@ -87,9 +95,15 @@ func _show_options() -> void:
 	options.visible = true
 
 
+func is_open() -> bool:
+	return root.visible
+
+
 func _quit() -> void:
 	Sfx.play("ui_confirm")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Game.net.leave()
+	get_tree().paused = false
 	Game.goto(Game.SCENE_MENU)
 
 
