@@ -11,6 +11,7 @@ const NightDial := preload("res://scripts/ui/widgets/night_dial.gd")
 const ClassData := preload("res://scripts/data/classes.gd")
 const Forge := preload("res://scripts/data/forge.gd")
 const ForgeChoice := preload("res://scripts/ui/forge_choice.gd")
+const ChatBox := preload("res://scripts/ui/chat_box.gd")
 
 const W := 1280
 const H := 720
@@ -76,6 +77,8 @@ var ally_state: Label
 var ally_tag: Control
 var ally_tag_name: Label
 var ally_tag_fill: ColorRect
+## Duo chat (opens with Enter).
+var chat: Control
 
 
 func setup(p_player: Node, p_director: Node) -> void:
@@ -280,7 +283,9 @@ func _build_console(cls: String) -> void:
 func _build_ally_frame() -> void:
 	var ally: Node = director.partner
 	ally_root = PanelContainer.new()
-	ally_root.position = Vector2(8, 38)
+	# top right, so the boss plate keeps the top left
+	ally_root.position = Vector2(W - 8 - 290, 38)
+	ally_root.custom_minimum_size = Vector2(290, 0)
 	ally_root.custom_minimum_size = Vector2(270, 0)
 	ally_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(ally_root)
@@ -306,8 +311,10 @@ func _build_ally_frame() -> void:
 	v.add_child(ally_bar)
 	ally_state = UiTheme.label("", 14, UiTheme.CREAM)
 	v.add_child(ally_state)
-	# the boss plate makes room under the ally
-	boss_root.position = Vector2(8, 112)
+	chat = ChatBox.new()
+	chat.position = Vector2(16, 140)
+	root.add_child(chat)
+	chat.setup(Vector2(430, 220), true)
 	ally_tag = Control.new()
 	ally_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(ally_tag)

@@ -7,12 +7,15 @@ extends Node
 
 signal lobby_changed
 signal status(text: String, is_error: bool)
+## A chat line, from the ally or echoed from this machine (mine = true).
+signal chat(who: String, text: String, mine: bool)
 
 const RelayPeer := preload("res://scripts/net/relay_peer.gd")
 ## The production relay (server/relay, Cloudflare Workers). Tests and local runs override it
 ## with the launch flag  relay=ws://127.0.0.1:8791
 const RELAY_URL := "wss://dreadhold-relay.dreadhold-relay.workers.dev"
 const MAX_NAME := 16
+const MAX_CHAT := 140
 
 var peer: RelayPeer = null
 var room_code := ""
@@ -227,6 +230,24 @@ func _begin(map: String, run_seed: int = 0) -> void:
 	Game.selected_class = my_class
 	Game.pending_save = {}
 	Game.goto(Game.SCENE_SURVIVAL)
+
+
+# ======================================================================= chat
+
+func say(text: String) -> void:
+	var t := text.strip_edges().substr(0, MAX_CHAT)
+	if t == "" or not connected() or players.size() < 2:
+		return
+	_chat.rpc(t)
+	chat.emit(my_name(), t, true)
+
+
+@rpc("any_peer", "reliable")
+func _chat(text: String) -> void:
+	var who := str(players.get(multiplayer.get_remote_sender_id(), {}).get("name", "Ally"))
+	if Game.test.has("log"):
+		print("[chat] %s: %s" % [who, text])
+	chat.emit(who, text.strip_edges().substr(0, MAX_CHAT), false)
 
 
 # ======================================================================= in-game messages

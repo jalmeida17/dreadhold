@@ -10,6 +10,7 @@ const ClassData := preload("res://scripts/data/classes.gd")
 const EnemyData := preload("res://scripts/data/enemies.gd")
 const OptionsPanel := preload("res://scripts/ui/options_panel.gd")
 const Maps := preload("res://scripts/data/maps.gd")
+const ChatBox := preload("res://scripts/ui/chat_box.gd")
 
 var world: SubViewport
 var arena: Node3D
@@ -33,6 +34,7 @@ var _room_players: VBoxContainer
 var _room_maps := {}
 var _lobby_status: Label
 var _lobby_go: Button
+var _lobby_chat: Control
 var _map_cards := {}
 var _selected_map := "keep"
 var options_center: CenterContainer
@@ -763,7 +765,7 @@ func _build_lobby_page() -> void:
 	_lobby_room.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_lobby_room.visible = false
 	page_lobby.add_child(_lobby_room)
-	var rv := _hall_panel(Vector2(190, 172), Vector2(900, 400), _lobby_room)
+	var rv := _hall_panel(Vector2(190, 186), Vector2(900, 360), _lobby_room)
 	rv.add_theme_constant_override("separation", 10)
 	var code_row := HBoxContainer.new()
 	code_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -795,7 +797,7 @@ func _build_lobby_page() -> void:
 		_room_maps[id] = b
 
 	_lobby_status = UiTheme.label("", 18, UiTheme.CREAM, HORIZONTAL_ALIGNMENT_CENTER)
-	_lobby_status.position = Vector2(0, 594)
+	_lobby_status.position = Vector2(0, 158)
 	_lobby_status.size = Vector2(1280, 26)
 	page_lobby.add_child(_lobby_status)
 	var back := Button.new()
@@ -807,6 +809,10 @@ func _build_lobby_page() -> void:
 		Sfx.play("ui_click")
 		_leave_lobby())
 	page_lobby.add_child(back)
+	_lobby_chat = ChatBox.new()
+	_lobby_chat.position = Vector2(300, 556)
+	_lobby_room.add_child(_lobby_chat)
+	_lobby_chat.setup(Vector2(560, 150), false)
 	_lobby_go = Button.new()
 	_lobby_go.text = "BEGIN THE VIGIL"
 	_lobby_go.position = Vector2(880, 648)

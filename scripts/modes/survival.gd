@@ -261,7 +261,21 @@ func _input(event: InputEvent) -> void:
 		player.look(event.relative)
 
 
+func chat_typing() -> bool:
+	return hud != null and hud.chat != null and hud.chat.is_typing()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if duo and hud.chat != null and event is InputEventKey and event.pressed and not event.echo \
+			and event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER] and not chat_typing() \
+			and not pause_menu.is_open() and not market.is_open() and not forge_ui.is_open():
+		hud.chat.open()
+		get_viewport().set_input_as_handled()
+		return
+	if chat_typing():
+		if event is InputEventMouseButton and event.pressed:
+			hud.chat.close()
+		return
 	if event.is_action_pressed("pause") and phase != Phase.OVER:
 		pause_menu.open()
 		get_viewport().set_input_as_handled()
@@ -275,7 +289,7 @@ func _watch_pointer_lock() -> void:
 	## pause instead of leaving the champion unable to look around.
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	if _had_capture and not captured and OS.has_feature("web") and phase != Phase.OVER and not get_tree().paused \
-			and not pause_menu.is_open() and not market.is_open():
+			and not pause_menu.is_open() and not market.is_open() and not chat_typing() and not forge_ui.is_open():
 		pause_menu.open()
 	_had_capture = captured
 
@@ -809,6 +823,9 @@ func can_shop() -> bool:
 
 func _start_duo() -> void:
 	Game.net.attach(self)
+	if Game.test.has("say"):
+		# test hook: say something a few seconds into the vigil
+		get_tree().create_timer(6.0).timeout.connect(func(): Game.net.say(str(Game.test["say"]).replace("_", " ")))
 	phase = Phase.PREP
 	phase_t = 0.0
 	_prep_len = 999.0

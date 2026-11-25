@@ -95,6 +95,7 @@ asset is the [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL 
   - A fallen champion is **down, not dead**: hold `F` next to them for 3 seconds to raise them, or they rise
     at dawn. The vigil ends when both are down.
   - Your ally is drawn as a full champion sprite, with a frame, a name tag and a minimap marker.
+  - Press `Enter` to chat with your ally (the Duo Hall has a chat line too).
 - **Soundtrack and ambience**: the night music grows heavier every five nights, each boss has its own theme,
   dawn has the goblin's market tune, and every battlefield has its own looping ambience bed.
 - **RTS-inspired console HUD**: minimap with spawn pings, living portrait, and a command card with hotkeys and radial cooldowns. A night dial shows the night's progress, and a boss plate tracks the boss's phylacteries.
@@ -119,6 +120,7 @@ asset is the [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL 
 | Utility ability | `E` or `Shift` |
 | Drink a potion | `R` |
 | Talk to the goblin / raise a fallen ally (hold) | `F` |
+| Chat with your ally (duo) | `Enter` |
 | Pick champion / battlefield | `1`–`4`, `Enter` |
 | Pause menu | `Esc` |
 
