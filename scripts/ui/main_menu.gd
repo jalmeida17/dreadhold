@@ -9,6 +9,7 @@ const UiTheme := preload("res://scripts/ui/ui_theme.gd")
 const ClassData := preload("res://scripts/data/classes.gd")
 const EnemyData := preload("res://scripts/data/enemies.gd")
 const OptionsPanel := preload("res://scripts/ui/options_panel.gd")
+const Maps := preload("res://scripts/data/maps.gd")
 
 var world: SubViewport
 var arena: Node3D
@@ -16,6 +17,9 @@ var cam: Camera3D
 var ui: Control
 var page_title: Control
 var page_classes: Control
+var page_maps: Control
+var _map_cards := {}
+var _selected_map := "keep"
 var options_center: CenterContainer
 var options: PanelContainer
 var _t := 0.0
@@ -55,6 +59,8 @@ func _ready() -> void:
 	Sfx.music("music_menu")
 	if Game.menu_page == "classes":
 		_show_classes()
+	elif Game.menu_page == "maps":
+		_show_maps()
 	Game.menu_page = "title"
 
 
@@ -74,6 +80,16 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if page_maps.visible and event is InputEventKey and event.pressed and not event.echo:
+		var keys := [KEY_1, KEY_2, KEY_3, KEY_4]
+		var idx := keys.find(event.physical_keycode)
+		if idx >= 0 and idx < Maps.ORDER.size():
+			_select_map(Maps.ORDER[idx])
+		elif event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]:
+			_begin()
+		elif event.physical_keycode == KEY_ESCAPE:
+			_show_classes()
+		return
 	if not page_classes.visible:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -89,7 +105,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_DOWN:
 				_select(ClassData.ORDER[(ClassData.ORDER.find(_selected) + 1) % 3])
 			KEY_ENTER, KEY_KP_ENTER:
-				_begin()
+				_show_maps()
 			KEY_ESCAPE:
 				_show_title()
 
@@ -141,6 +157,7 @@ func _build_ui() -> void:
 	page_title.add_child(credit)
 
 	_build_class_page()
+	_build_map_page()
 
 	options_center = CenterContainer.new()
 	options_center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -168,12 +185,14 @@ func _menu_button(parent: Control, text: String, cb: Callable) -> Button:
 func _show_title() -> void:
 	page_title.visible = true
 	page_classes.visible = false
+	page_maps.visible = false
 	options.visible = false
 
 
 func _show_classes() -> void:
 	page_title.visible = false
 	page_classes.visible = true
+	page_maps.visible = false
 	options.visible = false
 	_select(_selected, true)
 
@@ -181,7 +200,17 @@ func _show_classes() -> void:
 func _show_options() -> void:
 	page_title.visible = false
 	page_classes.visible = false
+	page_maps.visible = false
 	options.visible = true
+
+
+func _show_maps() -> void:
+	Sfx.play("ui_confirm", -4.0)
+	page_title.visible = false
+	page_classes.visible = false
+	page_maps.visible = true
+	options.visible = false
+	_select_map(Game.selected_map, true)
 
 
 # ======================================================================= champion selection
@@ -207,7 +236,7 @@ func _build_class_page() -> void:
 	title.position = Vector2(0, 18)
 	title.size = Vector2(1280, 56)
 	page_classes.add_child(title)
-	var hint := UiTheme.label("Click a champion or press 1 / 2 / 3  -  ENTER to begin  -  double-click to start at once", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
+	var hint := UiTheme.label("Click a champion or press 1 / 2 / 3  -  ENTER to continue  -  double-click to pick at once", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
 	hint.position = Vector2(0, 72)
 	hint.size = Vector2(1280, 22)
 	page_classes.add_child(hint)
@@ -224,11 +253,11 @@ func _build_class_page() -> void:
 		_show_title())
 	page_classes.add_child(back)
 	var go := Button.new()
-	go.text = "BEGIN THE VIGIL"
+	go.text = "CHOOSE BATTLEFIELD"
 	go.position = Vector2(880, 648)
 	go.custom_minimum_size = Vector2(340, 64)
-	go.add_theme_font_size_override("font_size", 28)
-	go.pressed.connect(_begin)
+	go.add_theme_font_size_override("font_size", 26)
+	go.pressed.connect(_show_maps)
 	go.mouse_entered.connect(func(): Sfx.play("ui_hover", -8.0))
 	page_classes.add_child(go)
 
@@ -276,7 +305,7 @@ func _class_plate(id: String, index: int) -> Button:
 	btn.gui_input.connect(func(ev: InputEvent):
 		if ev is InputEventMouseButton and ev.double_click:
 			_select(id)
-			_begin())
+			_show_maps())
 	_plates[id] = btn
 	_plate_pics[id] = [pic, ptex, nfr]
 	return btn
@@ -413,7 +442,104 @@ func _select(id: String, silent: bool = false) -> void:
 		Sfx.play("ui_confirm", -4.0)
 
 
+func _build_map_page() -> void:
+	page_maps = Control.new()
+	page_maps.set_anchors_preset(Control.PRESET_FULL_RECT)
+	page_maps.visible = false
+	page_maps.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(page_maps)
+	var title := UiTheme.title("CHOOSE YOUR BATTLEFIELD", 44, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	title.position = Vector2(0, 18)
+	title.size = Vector2(1280, 56)
+	page_maps.add_child(title)
+	var hint := UiTheme.label("Click a battlefield or press 1 - 4  -  ENTER to begin the vigil", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
+	hint.position = Vector2(0, 72)
+	hint.size = Vector2(1280, 22)
+	page_maps.add_child(hint)
+	for i in Maps.ORDER.size():
+		page_maps.add_child(_map_card(Maps.ORDER[i], i))
+	var back := Button.new()
+	back.text = "BACK"
+	back.position = Vector2(60, 650)
+	back.custom_minimum_size = Vector2(220, 58)
+	back.add_theme_font_size_override("font_size", 24)
+	back.pressed.connect(func():
+		Sfx.play("ui_click")
+		_show_classes())
+	page_maps.add_child(back)
+	var go := Button.new()
+	go.text = "BEGIN THE VIGIL"
+	go.position = Vector2(880, 648)
+	go.custom_minimum_size = Vector2(340, 64)
+	go.add_theme_font_size_override("font_size", 28)
+	go.pressed.connect(_begin)
+	page_maps.add_child(go)
+
+
+func _map_card(id: String, index: int) -> Button:
+	var m: Dictionary = Maps.MAPS[id]
+	var btn := Button.new()
+	btn.position = Vector2(42 + index * 302, 150)
+	btn.custom_minimum_size = Vector2(290, 400)
+	btn.size = Vector2(290, 400)
+	btn.add_theme_stylebox_override("normal", _plate_style(0))
+	btn.add_theme_stylebox_override("hover", _plate_style(1))
+	btn.add_theme_stylebox_override("pressed", _plate_style(2))
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var v := VBoxContainer.new()
+	v.set_anchors_preset(Control.PRESET_FULL_RECT)
+	v.offset_left = 24
+	v.offset_top = 24
+	v.offset_right = -24
+	v.offset_bottom = -22
+	v.add_theme_constant_override("separation", 8)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(v)
+	var thumb := TextureRect.new()
+	thumb.custom_minimum_size = Vector2(240, 135)
+	thumb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	thumb.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if ResourceLoader.exists(m.thumb):
+		thumb.texture = load(m.thumb)
+	v.add_child(thumb)
+	var name_l := UiTheme.title(str(m.name).to_upper(), 22, UiTheme.GOLD)
+	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_l.custom_minimum_size = Vector2(238, 0)
+	v.add_child(name_l)
+	var diff := int(m.difficulty) - 1
+	v.add_child(UiTheme.label("Difficulty:  %s" % ["Easy", "Medium", "Hard"][diff], 16, [UiTheme.GREEN, Color(1.0, 0.8, 0.3), UiTheme.RED][diff]))
+	var desc := UiTheme.label(str(m.desc), 17, UiTheme.CREAM)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.custom_minimum_size = Vector2(238, 0)
+	v.add_child(desc)
+	var key := UiTheme.title(str(index + 1), 18, UiTheme.GREY)
+	key.position = Vector2(254, 22)
+	btn.add_child(key)
+	btn.mouse_entered.connect(func(): Sfx.play("ui_hover", -10.0))
+	btn.pressed.connect(func(): _select_map(id))
+	btn.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.double_click:
+			_select_map(id)
+			_begin())
+	_map_cards[id] = btn
+	return btn
+
+
+func _select_map(id: String, silent: bool = false) -> void:
+	_selected_map = id
+	Game.selected_map = id
+	for k in _map_cards:
+		var b: Button = _map_cards[k]
+		b.add_theme_stylebox_override("normal", _plate_style(2 if k == id else 0))
+	if not silent:
+		Sfx.play("ui_confirm", -4.0)
+
+
 func _begin() -> void:
 	Sfx.play("ui_confirm")
+	Game.selected_map = _selected_map
 	Game.selected_class = _selected
 	Game.goto(Game.SCENE_SURVIVAL)

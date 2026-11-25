@@ -13,6 +13,7 @@ const SCENE_SURVIVAL := "res://scenes/survival.tscn"
 
 var selected_class := "warrior"
 var menu_page := "title"
+var selected_map := "keep"
 var settings := {
 	"mouse_sens": 0.12,
 	"master": 0.8,
@@ -57,8 +58,12 @@ func _parse_test_args() -> void:
 		test[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	if test.has("class"):
 		selected_class = test["class"]
+	if test.has("map"):
+		selected_map = test["map"]
 	if test.has("classes"):
 		menu_page = "classes"
+	if test.has("maps"):
+		menu_page = "maps"
 	if test.has("start"):
 		goto.call_deferred(SCENE_SURVIVAL)
 
