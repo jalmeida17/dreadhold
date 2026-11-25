@@ -4,7 +4,7 @@ extends Node
 const UiTheme := preload("res://scripts/ui/ui_theme.gd")
 
 const TITLE := "DREADHOLD"
-const VERSION := "0.1.0"
+const VERSION := "0.2.0"
 const SETTINGS_PATH := "user://settings.cfg"
 const RECORDS_PATH := "user://records.cfg"
 const SAVE_PATH := "user://vigil_save.json"
