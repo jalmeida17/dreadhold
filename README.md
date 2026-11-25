@@ -13,6 +13,8 @@
 ![Status](https://img.shields.io/badge/status-early%20prototype-orange)
 ![Duo](https://img.shields.io/badge/online-2--player%20co--op-8a2be2)
 
+### [▶ Play in your browser](https://dreadhold.vercel.app)
+
 </div>
 
 ---
@@ -26,6 +28,12 @@ Hold the line alone, or **online with an ally** in a duo vigil, in the desktop a
 **Every visual, sound and music track is generated procedurally by code in this repository**
 (textures, sprites, first-person weapons, portraits, UI, sound effects, music). The only third-party
 asset is the [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL Open Font License).
+
+## Play
+
+- **In the browser**: [dreadhold.vercel.app](https://dreadhold.vercel.app), on any recent desktop browser
+  (Chrome, Edge, Firefox). Click into the game to capture the mouse; `Esc` releases it and pauses.
+- **From source**: see *Getting started* below.
 
 ## Screenshots
 
