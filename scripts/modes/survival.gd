@@ -185,7 +185,13 @@ func _ready() -> void:
 		var fwd: Vector3 = player.flat_forward()
 		var right := fwd.cross(Vector3.UP)
 		var base: Vector3 = player.global_position
-		for l in [["skeleton", 5.5, -1.6], ["ghoul", 6.5, 1.4], ["cultist", 10.0, -3.0], ["archer", 10.5, 2.8], ["brute", 13.0, 0.0]]:
+		var lineup := [["skeleton", 5.5, -1.6], ["ghoul", 6.5, 1.4], ["cultist", 10.0, -3.0], ["archer", 10.5, 2.8], ["brute", 13.0, 0.0]]
+		if Game.test.has("forged"):
+			# test hook: a line-up of forged monsters instead of the classic ones
+			lineup = []
+			for k in 6:
+				lineup.append([Bestiary.new_id(int(Game.test["forged"]), rng), 5.5 + (k % 3) * 2.5, -3.2 + k * 1.3])
+		for l in lineup:
 			var e := spawn_enemy(l[0], base + fwd * float(l[1]) + right * float(l[2]))
 			e.set_physics_process(Game.test.has("live"))
 			e.state = 1

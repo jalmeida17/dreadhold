@@ -1,0 +1,59 @@
+{
+	"frame_size": 96,
+	"frames": 8,
+	"order": [
+		"body",
+		"armor",
+		"head",
+		"offhand",
+		"weapon",
+		"aura"
+	],
+	"parts": {
+		"body": [
+			"skeleton",
+			"ghoul",
+			"cultist",
+			"knight",
+			"wraith"
+		],
+		"armor": [
+			"rags",
+			"chain",
+			"pauldrons",
+			"cape"
+		],
+		"head": [
+			"skull",
+			"horned_skull",
+			"hood",
+			"helm",
+			"crowned_skull",
+			"wolf_skull"
+		],
+		"offhand": [
+			"shield",
+			"lantern",
+			"skull_orb"
+		],
+		"weapon": [
+			"sword",
+			"axe",
+			"spear",
+			"mace",
+			"greatsword",
+			"bow",
+			"staff",
+			"claws"
+		],
+		"aura": [
+			"frost",
+			"flame",
+			"plague",
+			"void"
+		]
+	},
+	"under_body": [
+		"cape"
+	]
+}
