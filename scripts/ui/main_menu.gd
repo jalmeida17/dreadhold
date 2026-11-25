@@ -141,7 +141,16 @@ func _build_ui() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	panel.add_child(v)
-	_menu_button(v, "SURVIVAL", _show_classes)
+	var save := Game.read_save()
+	if not save.is_empty():
+		_menu_button(v, "CONTINUE", func(): Game.continue_run())
+		var cname: String = str(ClassData.CLASSES.get(str(save.get("class", "")), {}).get("name", "?"))
+		var mname: String = str(Maps.MAPS.get(str(save.get("map", "")), {}).get("name", "?"))
+		var pl: Dictionary = save.get("player", {})
+		var summary := UiTheme.label("%s  -  %s
+Dawn after night %s  -  %d gold" % [cname, mname, UiTheme.roman(int(save.get("wave", 1))), int(pl.get("gold", 0))], 15, Color(0.8, 0.75, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
+		v.add_child(summary)
+	_menu_button(v, "SURVIVAL" if save.is_empty() else "NEW VIGIL", _show_classes)
 	var online := _menu_button(v, "ONLINE", func(): pass)
 	online.disabled = true
 	online.tooltip_text = "Online battles - coming soon"
@@ -539,6 +548,52 @@ func _select_map(id: String, silent: bool = false) -> void:
 
 
 func _begin() -> void:
+	if Game.has_save():
+		_confirm_new_vigil()
+		return
+	_start_new()
+
+
+func _confirm_new_vigil() -> void:
+	## A saved vigil exists: ask before replacing it.
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(dim)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(center)
+	var panel := PanelContainer.new()
+	center.add_child(panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	v.custom_minimum_size = Vector2(460, 0)
+	panel.add_child(v)
+	v.add_child(UiTheme.title("ABANDON YOUR VIGIL?", 30, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
+	var msg := UiTheme.label("A saved vigil is waiting for you. Starting a new one will erase it for good.", 18, UiTheme.CREAM, HORIZONTAL_ALIGNMENT_CENTER)
+	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(msg)
+	var h := HBoxContainer.new()
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_theme_constant_override("separation", 14)
+	v.add_child(h)
+	var keep := Button.new()
+	keep.text = "KEEP IT"
+	keep.custom_minimum_size = Vector2(190, 52)
+	keep.pressed.connect(func():
+		Sfx.play("ui_click")
+		dim.queue_free())
+	h.add_child(keep)
+	var erase := Button.new()
+	erase.text = "START NEW VIGIL"
+	erase.custom_minimum_size = Vector2(230, 52)
+	erase.pressed.connect(func():
+		Game.delete_save()
+		_start_new())
+	h.add_child(erase)
+
+
+func _start_new() -> void:
 	Sfx.play("ui_confirm")
 	Game.selected_map = _selected_map
 	Game.selected_class = _selected

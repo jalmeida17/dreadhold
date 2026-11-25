@@ -89,6 +89,12 @@ func _ready() -> void:
 	if Game.test.has("face"):
 		var fc: PackedStringArray = str(Game.test["face"]).split(",")
 		player.look_at_point(arena.cell_center(Vector2i(int(fc[0]), int(fc[1]))))
+	if not Game.pending_save.is_empty():
+		var data := Game.pending_save
+		Game.pending_save = {}
+		_restore(data)
+		_begin_dawn(data)
+		return
 	if Game.test.has("dawn"):
 		player.gold = int(Game.test.get("gold", "0"))
 		_begin_dawn()
@@ -389,20 +395,28 @@ func _return_to_keep() -> void:
 
 # ======================================================================= dawn: the black market
 
-func _begin_dawn() -> void:
+func _begin_dawn(from_save: Dictionary = {}) -> void:
 	phase = Phase.DAWN
 	phase_t = 0.0
-	var bounty := 25 + wave * 10
-	player.gold += bounty
-	stat_add("gold_earned", bounty)
-	pickup_message("+%d gold  (dawn bounty)" % bounty)
-	market.new_stock()
+	if from_save.is_empty():
+		var bounty := 25 + wave * 10
+		player.gold += bounty
+		stat_add("gold_earned", bounty)
+		pickup_message("+%d gold  (dawn bounty)" % bounty)
+		market.new_stock()
+	else:
+		var m: Dictionary = from_save.get("market", {})
+		market.restore_stock(m.get("stock", []), int(m.get("restock_cost", 20)))
+		pickup_message("Vigil resumed at the dawn of night %s" % UiTheme.roman(wave))
 	goblin = Goblin.new()
 	entities.add_child(goblin)
 	goblin.global_position = arena.cell_center(arena.goblin_cell)
 	hud.ping(goblin.global_position, Color(1.0, 0.8, 0.3))
 	hud.show_banner("A BLACK MARKET GOBLIN APPEARS", "Talk to Grizzle with [%s] to spend your gold" % Game.key_label(KEY_F), Color(1.0, 0.85, 0.45))
 	Sfx.play("boon_select")
+	if from_save.is_empty():
+		save_run()
+		pickup_message("Vigil saved")
 
 
 func goblin_near() -> bool:
@@ -437,6 +451,68 @@ func can_shop() -> bool:
 	return phase == Phase.DAWN
 
 
+# ======================================================================= saving
+
+func save_run() -> void:
+	## Checkpoint of the run, taken at dawn (and after every purchase at the market).
+	if phase != Phase.DAWN or not player.alive:
+		return
+	# automated test runs never touch the player's real save (unless asked with "save")
+	if not Game.test.is_empty() and not Game.test.has("save"):
+		return
+	Game.write_save({
+		"class": player.class_id,
+		"map": Game.selected_map,
+		"wave": wave,
+		"score": score,
+		"kills": player.kills,
+		"time": player.time_alive,
+		"stats": stats,
+		"player": {
+			"hp": player.hp,
+			"gold": player.gold,
+			"potions": player.potions,
+			"boons": player.boons,
+			"weapon_tier": player.weapon_tier,
+			"torch": player.has_torch,
+			"undying": player.undying,
+		},
+		"market": {"stock": market.stock, "restock_cost": market.restock_cost},
+	})
+
+
+func _restore(d: Dictionary) -> void:
+	wave = int(d.get("wave", 0))
+	score = int(d.get("score", 0))
+	var st: Dictionary = d.get("stats", {})
+	for k in st:
+		stats[k] = st[k]
+	var kbt: Dictionary = {}
+	var saved_kbt: Dictionary = st.get("kills_by_type", {})
+	for k in saved_kbt:
+		kbt[k] = int(saved_kbt[k])
+	stats["kills_by_type"] = kbt
+	player.kills = int(d.get("kills", 0))
+	player.time_alive = float(d.get("time", 0.0))
+	var p: Dictionary = d.get("player", {})
+	# rebuild the character by re-applying every upgrade, then restore the live values
+	var boons: Dictionary = p.get("boons", {})
+	for id in boons:
+		if Boons.BOONS.has(id):
+			for i in int(boons[id]):
+				player.apply_boon(id)
+	for i in int(p.get("weapon_tier", 0)):
+		player.upgrade_weapon()
+	if bool(p.get("torch", false)):
+		player.equip_torch()
+	player.hp = clampf(float(p.get("hp", player.max_hp)), 1.0, player.max_hp)
+	player.gold = int(p.get("gold", 0))
+	player.potions = clampi(int(p.get("potions", 1)), 0, player.max_potions)
+	player.undying = int(p.get("undying", 0))
+	player.power_flash = 0.0
+	player.heal_flash = 0.0
+
+
 # ======================================================================= stats & messages
 
 func stat_add(key: String, v: float) -> void:
@@ -464,7 +540,11 @@ func _on_player_died() -> void:
 	Sfx.play("game_over")
 	if Game.test.has("log"):
 		print("[player] died at night %d kills=%d" % [wave, player.kills])
-	var best: bool = Game.submit_record(Game.selected_class, wave, player.kills, score)
+	# the vigil ends with the champion: no save survives death
+	var best := false
+	if Game.test.is_empty():
+		Game.delete_save()
+		best = Game.submit_record(Game.selected_class, wave, player.kills, score)
 	var t := get_tree().create_timer(2.5, true)
 	t.timeout.connect(func():
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

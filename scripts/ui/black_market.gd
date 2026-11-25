@@ -224,6 +224,17 @@ func _details() -> Control:
 
 # ======================================================================= stock
 
+func restore_stock(saved: Array, cost: int) -> void:
+	stock.clear()
+	for w in saved:
+		if typeof(w) == TYPE_DICTIONARY and w.has("kind"):
+			stock.append({"kind": str(w.kind), "id": str(w.get("id", "")), "price": int(w.get("price", 0)), "sold": bool(w.get("sold", false))})
+	if stock.is_empty():
+		_roll()
+	restock_cost = cost
+	selected = 0
+
+
 func new_stock() -> void:
 	## Called at each dawn: 6 random abilities/upgrades + supplies.
 	restock_cost = 20
@@ -480,6 +491,7 @@ func _buy(i: int) -> void:
 		_:
 			player.apply_boon(w.id)
 	director.stat_add("gold_spent", float(w.price))
+	director.save_run()
 	Sfx.play("coin_pickup")
 	Sfx.play("boon_select", -6.0)
 	_laugh_t = 0.8
@@ -493,6 +505,7 @@ func _restock() -> void:
 	player.gold -= restock_cost
 	restock_cost += 15
 	_roll()
+	director.save_run()
 	Sfx.play("ui_confirm")
 	_laugh_t = 0.6
 	_refresh()

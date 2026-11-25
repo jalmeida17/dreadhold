@@ -7,6 +7,8 @@ const TITLE := "DREADHOLD"
 const VERSION := "0.1.0"
 const SETTINGS_PATH := "user://settings.cfg"
 const RECORDS_PATH := "user://records.cfg"
+const SAVE_PATH := "user://vigil_save.json"
+const SAVE_VERSION := 1
 
 const SCENE_MENU := "res://scenes/main_menu.tscn"
 const SCENE_SURVIVAL := "res://scenes/survival.tscn"
@@ -14,6 +16,8 @@ const SCENE_SURVIVAL := "res://scenes/survival.tscn"
 var selected_class := "warrior"
 var menu_page := "title"
 var selected_map := "keep"
+## Run state to restore when the survival scene starts (set by continue_run()).
+var pending_save: Dictionary = {}
 var settings := {
 	"mouse_sens": 0.12,
 	"master": 0.8,
@@ -64,6 +68,8 @@ func _parse_test_args() -> void:
 		menu_page = "classes"
 	if test.has("maps"):
 		menu_page = "maps"
+	if test.has("continue"):
+		continue_run.call_deferred()
 	if test.has("start"):
 		goto.call_deferred(SCENE_SURVIVAL)
 
@@ -205,6 +211,52 @@ func submit_record(class_id: String, wave: int, kills: int, score: int) -> bool:
 func _on_node_added(n: Node) -> void:
 	if n is BaseButton:
 		(n as BaseButton).mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+
+# ------------------------------------------------------------------ run save (checkpoint at every dawn)
+
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH) and not read_save().is_empty()
+
+
+func read_save() -> Dictionary:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return {}
+	var txt := FileAccess.get_file_as_string(SAVE_PATH)
+	var data = JSON.parse_string(txt)
+	if typeof(data) != TYPE_DICTIONARY or int(data.get("version", 0)) != SAVE_VERSION:
+		return {}
+	return data
+
+
+func write_save(data: Dictionary) -> void:
+	data["version"] = SAVE_VERSION
+	data["saved_at"] = Time.get_datetime_string_from_system(false, true)
+	var tmp := SAVE_PATH + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
+	if f == null:
+		push_warning("could not write the save file")
+		return
+	f.store_string(JSON.stringify(data, "\t"))
+	f.close()
+	# write-then-rename so a crash mid-write never corrupts the previous save
+	DirAccess.rename_absolute(ProjectSettings.globalize_path(tmp), ProjectSettings.globalize_path(SAVE_PATH))
+
+
+func delete_save() -> void:
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	pending_save = {}
+
+
+func continue_run() -> void:
+	var data := read_save()
+	if data.is_empty():
+		return
+	pending_save = data
+	selected_class = str(data.get("class", selected_class))
+	selected_map = str(data.get("map", selected_map))
+	goto(SCENE_SURVIVAL)
 
 
 func goto(path: String) -> void:

@@ -32,7 +32,11 @@ func _ready() -> void:
 	menu.add_child(v)
 	v.add_child(UiTheme.title("PAUSED", 44, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UiTheme.label("The dead wait patiently.", 18, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
-	for item in [["RETURN TO GAME", close], ["OPTIONS", _show_options], ["ABANDON RUN", _quit]]:
+	var note := UiTheme.label("Your vigil is saved at every dawn. Quitting resumes it from the last dawn.", 15, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.custom_minimum_size = Vector2(380, 0)
+	v.add_child(note)
+	for item in [["RETURN TO GAME", close], ["OPTIONS", _show_options], ["QUIT TO MENU", _quit], ["ABANDON VIGIL", _abandon]]:
 		var b := Button.new()
 		b.text = item[0]
 		b.custom_minimum_size = Vector2(380, 56)
@@ -87,3 +91,8 @@ func _quit() -> void:
 	Sfx.play("ui_confirm")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Game.goto(Game.SCENE_MENU)
+
+
+func _abandon() -> void:
+	Game.delete_save()
+	_quit()
