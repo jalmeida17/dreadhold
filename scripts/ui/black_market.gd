@@ -1,6 +1,6 @@
 extends CanvasLayer
-## Grizzle's Black Market: the dawn shop. A clear list of wares (Abilities / Supplies) on
-## the left, the selected ware's details with a big BUY button on the right.
+## Grizzle's Black Market: the dawn shop. Compact layout: abilities as slim rows,
+## supplies as small tiles, the selected ware's details and a BUY button on the right.
 
 const UiTheme := preload("res://scripts/ui/ui_theme.gd")
 const Boons := preload("res://scripts/data/boons.gd")
@@ -8,6 +8,7 @@ const Boons := preload("res://scripts/data/boons.gd")
 const PRICES := {"common": 60, "rare": 110, "epic": 180, "legendary": 300}
 const POTION_PRICE := 40
 const MEND_PRICE := 30
+const TORCH_PRICE := 50
 const QUOTES := [
 	"Psst... finest goods this side of the grave!",
 	"No refunds. No questions. No witnesses.",
@@ -15,6 +16,8 @@ const QUOTES := [
 	"Fell off a cart, these did. A very haunted cart.",
 	"The dead don't need it. You might!",
 ]
+const PANEL_BG := Color(0.07, 0.065, 0.06, 0.92)
+const LINE := Color(0.26, 0.23, 0.2)
 
 signal begin_night
 
@@ -22,6 +25,7 @@ var player: Node
 var director: Node
 var root: Control
 var list_box: VBoxContainer
+var supply_box: HBoxContainer
 var gold_label: Label
 var quote_label: Label
 var d_icon: TextureRect
@@ -57,53 +61,79 @@ func setup(p_player: Node, p_director: Node) -> void:
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(dim)
 	var frame := PanelContainer.new()
-	frame.position = Vector2(150, 40)
-	frame.custom_minimum_size = Vector2(980, 640)
+	frame.position = Vector2(190, 70)
+	frame.custom_minimum_size = Vector2(900, 0)
 	root.add_child(frame)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 14)
+	v.add_theme_constant_override("separation", 12)
 	frame.add_child(v)
 	v.add_child(_header())
 	var body := HBoxContainer.new()
-	body.add_theme_constant_override("separation", 18)
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 16)
 	v.add_child(body)
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 6)
+	left.custom_minimum_size = Vector2(470, 0)
+	body.add_child(left)
+	left.add_child(UiTheme.title("ABILITIES & UPGRADES", 15, UiTheme.GOLD_DARK))
 	list_box = VBoxContainer.new()
-	list_box.add_theme_constant_override("separation", 4)
-	list_box.custom_minimum_size = Vector2(520, 0)
-	body.add_child(list_box)
+	list_box.add_theme_constant_override("separation", 2)
+	left.add_child(list_box)
+	var sp := Control.new()
+	sp.custom_minimum_size = Vector2(0, 4)
+	left.add_child(sp)
+	left.add_child(UiTheme.title("SUPPLIES", 15, UiTheme.GOLD_DARK))
+	supply_box = HBoxContainer.new()
+	supply_box.add_theme_constant_override("separation", 6)
+	left.add_child(supply_box)
 	body.add_child(_details())
 	var btns := HBoxContainer.new()
 	btns.alignment = BoxContainer.ALIGNMENT_CENTER
-	btns.add_theme_constant_override("separation", 16)
+	btns.add_theme_constant_override("separation", 14)
 	v.add_child(btns)
 	restock_btn = Button.new()
-	restock_btn.custom_minimum_size = Vector2(240, 52)
-	restock_btn.add_theme_font_size_override("font_size", 18)
+	restock_btn.custom_minimum_size = Vector2(210, 46)
+	restock_btn.add_theme_font_size_override("font_size", 17)
 	restock_btn.pressed.connect(_restock)
 	btns.add_child(restock_btn)
 	var close := Button.new()
 	close.text = "CLOSE  [ESC]"
-	close.custom_minimum_size = Vector2(200, 52)
-	close.add_theme_font_size_override("font_size", 18)
+	close.custom_minimum_size = Vector2(180, 46)
+	close.add_theme_font_size_override("font_size", 17)
 	close.pressed.connect(close_shop)
 	btns.add_child(close)
 	var go := Button.new()
 	go.text = "BEGIN THE NIGHT"
-	go.custom_minimum_size = Vector2(290, 52)
-	go.add_theme_font_size_override("font_size", 22)
+	go.custom_minimum_size = Vector2(250, 46)
+	go.add_theme_font_size_override("font_size", 20)
 	go.pressed.connect(_begin)
 	btns.add_child(go)
 
 
+func _flat(bg: Color, accent: Color = Color(0, 0, 0, 0), bottom: Color = LINE) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = bottom
+	sb.border_width_bottom = 1
+	if accent.a > 0.0:
+		sb.border_color = accent
+		sb.border_width_left = 3
+		sb.border_width_bottom = 1
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	return sb
+
+
 func _header() -> Control:
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 16)
+	head.add_theme_constant_override("separation", 14)
 	portrait = TextureRect.new()
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.stretch_mode = TextureRect.STRETCH_SCALE
 	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	portrait.custom_minimum_size = Vector2(96, 96)
+	portrait.custom_minimum_size = Vector2(72, 72)
 	portrait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var ppath := "res://assets/ui/portrait_goblin.png"
 	if ResourceLoader.exists(ppath):
@@ -113,83 +143,89 @@ func _header() -> Control:
 		for i in n:
 			var a := AtlasTexture.new()
 			a.atlas = pt
-			a.region = Rect2(i * fs + (fs - 48) / 2, (fs - 48) / 2, 48, 48)
+			a.region = Rect2(i * fs + (fs - 36) / 2, (fs - 36) / 2 - 4, 36, 36)
 			_portrait_frames.append(a)
 		portrait.texture = _portrait_frames[0]
 	head.add_child(portrait)
 	var hv := VBoxContainer.new()
-	hv.add_theme_constant_override("separation", 4)
+	hv.add_theme_constant_override("separation", 2)
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hv.alignment = BoxContainer.ALIGNMENT_CENTER
 	head.add_child(hv)
-	hv.add_child(UiTheme.title("GRIZZLE'S BLACK MARKET", 32, UiTheme.GOLD))
-	quote_label = UiTheme.label("", 18, Color(0.75, 0.85, 0.55))
+	hv.add_child(UiTheme.title("GRIZZLE'S BLACK MARKET", 26, UiTheme.GOLD))
+	quote_label = UiTheme.label("", 16, Color(0.75, 0.85, 0.55))
 	hv.add_child(quote_label)
 	var gold_box := HBoxContainer.new()
-	gold_box.add_theme_constant_override("separation", 8)
+	gold_box.add_theme_constant_override("separation", 6)
 	gold_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	head.add_child(gold_box)
-	gold_box.add_child(UiTheme.pix(load("res://assets/ui/icons/gold.png"), 1.5))
-	gold_label = UiTheme.title("0", 30, UiTheme.GOLD)
+	gold_box.add_child(UiTheme.pix(load("res://assets/ui/icons/gold.png"), 1.0))
+	gold_label = UiTheme.title("0", 26, UiTheme.GOLD)
 	gold_box.add_child(gold_label)
 	return head
 
 
 func _details() -> Control:
 	var panel := PanelContainer.new()
-	var tip := StyleBoxTexture.new()
-	tip.texture = load("res://assets/ui/wc3/tooltip.png")
-	for side in [SIDE_LEFT, SIDE_RIGHT, SIDE_TOP, SIDE_BOTTOM]:
-		tip.set_texture_margin(side, 8)
-		tip.set_content_margin(side, 18)
-	panel.add_theme_stylebox_override("panel", tip)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = PANEL_BG
+	sb.border_color = LINE
+	sb.set_border_width_all(1)
+	sb.set_content_margin_all(16)
+	panel.add_theme_stylebox_override("panel", sb)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
+	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 14)
+	top.add_theme_constant_override("separation", 12)
 	v.add_child(top)
 	d_icon = TextureRect.new()
 	d_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	d_icon.stretch_mode = TextureRect.STRETCH_SCALE
 	d_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	d_icon.custom_minimum_size = Vector2(72, 72)
+	d_icon.custom_minimum_size = Vector2(48, 48)
 	d_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(d_icon)
 	var tv := VBoxContainer.new()
+	tv.add_theme_constant_override("separation", 0)
 	tv.alignment = BoxContainer.ALIGNMENT_CENTER
 	top.add_child(tv)
-	d_name = UiTheme.title("", 24, UiTheme.GOLD)
+	d_name = UiTheme.title("", 21, UiTheme.GOLD)
 	d_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	d_name.custom_minimum_size = Vector2(260, 0)
+	d_name.custom_minimum_size = Vector2(270, 0)
 	tv.add_child(d_name)
-	d_tag = UiTheme.label("", 16, UiTheme.GREY)
+	d_tag = UiTheme.label("", 15, UiTheme.GREY)
 	tv.add_child(d_tag)
-	d_owned = UiTheme.label("", 16, Color(0.75, 0.85, 0.55))
-	v.add_child(d_owned)
-	d_desc = UiTheme.label("", 19, UiTheme.CREAM)
+	d_desc = UiTheme.label("", 18, UiTheme.CREAM)
 	d_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	d_desc.custom_minimum_size = Vector2(340, 90)
+	d_desc.custom_minimum_size = Vector2(330, 84)
 	v.add_child(d_desc)
+	d_owned = UiTheme.label("", 15, Color(0.75, 0.85, 0.55))
+	v.add_child(d_owned)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
-	d_price = UiTheme.title("", 26, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	v.add_child(d_price)
+	var buy_row := HBoxContainer.new()
+	buy_row.add_theme_constant_override("separation", 12)
+	v.add_child(buy_row)
+	d_price = UiTheme.title("", 22, UiTheme.GOLD)
+	d_price.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	d_price.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	buy_row.add_child(d_price)
 	buy_btn = Button.new()
 	buy_btn.text = "BUY"
-	buy_btn.custom_minimum_size = Vector2(0, 58)
-	buy_btn.add_theme_font_size_override("font_size", 26)
+	buy_btn.custom_minimum_size = Vector2(150, 50)
+	buy_btn.add_theme_font_size_override("font_size", 22)
 	buy_btn.pressed.connect(func(): _buy(selected))
-	v.add_child(buy_btn)
+	buy_row.add_child(buy_btn)
 	return panel
 
 
 # ======================================================================= stock
 
 func new_stock() -> void:
-	## Called at each dawn: 6 random abilities/upgrades + a potion + mending.
+	## Called at each dawn: 6 random abilities/upgrades + supplies.
 	restock_cost = 20
 	_roll()
 
@@ -198,6 +234,8 @@ func _roll() -> void:
 	stock.clear()
 	for id in Boons.roll(player.class_id, player.boons, 6, rng):
 		stock.append({"kind": "boon", "id": id, "price": int(PRICES[Boons.BOONS[id].rarity]), "sold": false})
+	if player.class_id == "warrior" and not player.has_torch:
+		stock.append({"kind": "torch", "id": "torch", "price": TORCH_PRICE, "sold": false})
 	stock.append({"kind": "potion", "id": "potion", "price": POTION_PRICE, "sold": false})
 	stock.append({"kind": "mend", "id": "mend", "price": MEND_PRICE, "sold": false})
 	selected = 0
@@ -243,6 +281,8 @@ func _ware_name(w: Dictionary) -> String:
 			return "Health Potion"
 		"mend":
 			return "Mend Wounds"
+		"torch":
+			return "Off-hand Torch"
 	return str(Boons.BOONS[w.id].name)
 
 
@@ -252,6 +292,8 @@ func _ware_icon(w: Dictionary) -> Texture2D:
 			return load("res://assets/ui/icons/potion.png")
 		"mend":
 			return load("res://assets/ui/icons/health.png")
+		"torch":
+			return load("res://assets/ui/icons/torch.png")
 	return load("res://assets/ui/icons/%s.png" % Boons.BOONS[w.id].icon)
 
 
@@ -267,6 +309,8 @@ func _ware_tag(w: Dictionary) -> String:
 			return "Supply"
 		"mend":
 			return "Service"
+		"torch":
+			return "Warrior gear"
 	var b: Dictionary = Boons.BOONS[w.id]
 	var t := str(b.rarity).capitalize()
 	if b.has("class"):
@@ -282,19 +326,9 @@ func _can_buy(w: Dictionary) -> bool:
 			return player.potions < player.max_potions
 		"mend":
 			return player.hp < player.max_hp
+		"torch":
+			return not player.has_torch
 	return true
-
-
-func _row_style(bg: Color, border: Color) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = border
-	sb.set_border_width_all(2)
-	sb.content_margin_left = 10
-	sb.content_margin_right = 12
-	sb.content_margin_top = 4
-	sb.content_margin_bottom = 4
-	return sb
 
 
 # ======================================================================= list & details
@@ -305,50 +339,28 @@ func _refresh() -> void:
 	restock_btn.disabled = player.gold < restock_cost
 	for c in list_box.get_children():
 		c.queue_free()
-	list_box.add_child(UiTheme.title("ABILITIES & UPGRADES", 16, UiTheme.GOLD))
+	for c in supply_box.get_children():
+		c.queue_free()
 	for i in stock.size():
-		if i == stock.size() - 2:
-			var sp := Control.new()
-			sp.custom_minimum_size = Vector2(0, 6)
-			list_box.add_child(sp)
-			list_box.add_child(UiTheme.title("SUPPLIES", 16, UiTheme.GOLD))
-		list_box.add_child(_row(i))
+		if stock[i].kind == "boon":
+			list_box.add_child(_row(i))
+		else:
+			supply_box.add_child(_tile(i))
 	_show_details()
 
 
-func _row(i: int) -> Button:
-	var w: Dictionary = stock[i]
-	var b := Button.new()
-	b.custom_minimum_size = Vector2(520, 44)
-	var sel := i == selected
-	b.add_theme_stylebox_override("normal", _row_style(Color(0.1, 0.09, 0.09, 0.95) if not sel else Color(0.2, 0.17, 0.1, 0.95), UiTheme.GOLD if sel else Color(0.28, 0.26, 0.24)))
-	b.add_theme_stylebox_override("hover", _row_style(Color(0.16, 0.14, 0.12, 0.95), UiTheme.GOLD_DARK if not sel else UiTheme.GOLD))
-	b.add_theme_stylebox_override("pressed", _row_style(Color(0.22, 0.18, 0.1, 0.95), UiTheme.GOLD))
-	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	var h := HBoxContainer.new()
-	h.set_anchors_preset(Control.PRESET_FULL_RECT)
-	h.offset_left = 10
-	h.offset_right = -12
-	h.add_theme_constant_override("separation", 12)
-	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(h)
-	var ic := UiTheme.pix(_ware_icon(w), 1.5)
+func _price_text(w: Dictionary) -> String:
+	return "SOLD" if w.sold else "%d g" % int(w.price)
+
+
+func _price_color(w: Dictionary) -> Color:
 	if w.sold:
-		ic.modulate = Color(0.35, 0.35, 0.35)
-	h.add_child(ic)
-	var n := UiTheme.title(_ware_name(w), 18, _ware_color(w) if not w.sold else UiTheme.GREY)
-	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	n.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	h.add_child(n)
-	var tag := UiTheme.label(_ware_tag(w), 14, UiTheme.GREY)
-	tag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	h.add_child(tag)
-	var ptxt := "SOLD" if w.sold else "%d g" % int(w.price)
-	var pcol := UiTheme.GREY if w.sold else (UiTheme.GOLD if player.gold >= int(w.price) else UiTheme.RED)
-	var p := UiTheme.title(ptxt, 18, pcol, HORIZONTAL_ALIGNMENT_RIGHT)
-	p.custom_minimum_size = Vector2(70, 0)
-	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	h.add_child(p)
+		return UiTheme.GREY
+	return UiTheme.GOLD if player.gold >= int(w.price) else UiTheme.RED
+
+
+func _hookup(b: Button, i: int) -> void:
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	b.mouse_entered.connect(func(): Sfx.play("ui_hover", -10.0))
 	b.pressed.connect(func():
 		selected = i
@@ -358,6 +370,67 @@ func _row(i: int) -> Button:
 		if ev is InputEventMouseButton and ev.double_click:
 			selected = i
 			_buy(i))
+
+
+func _row(i: int) -> Button:
+	var w: Dictionary = stock[i]
+	var sel := i == selected
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(470, 36)
+	b.add_theme_stylebox_override("normal", _flat(Color(0.16, 0.13, 0.08, 0.95) if sel else Color(0.08, 0.075, 0.07, 0.85), UiTheme.GOLD if sel else Color(0, 0, 0, 0)))
+	b.add_theme_stylebox_override("hover", _flat(Color(0.13, 0.11, 0.09, 0.95), UiTheme.GOLD if sel else UiTheme.GOLD_DARK))
+	b.add_theme_stylebox_override("pressed", _flat(Color(0.18, 0.14, 0.08, 0.95), UiTheme.GOLD))
+	var h := HBoxContainer.new()
+	h.set_anchors_preset(Control.PRESET_FULL_RECT)
+	h.offset_left = 10
+	h.offset_right = -10
+	h.add_theme_constant_override("separation", 10)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(h)
+	var ic := UiTheme.pix(_ware_icon(w), 1.0)
+	if w.sold:
+		ic.modulate = Color(0.35, 0.35, 0.35)
+	h.add_child(ic)
+	var n := UiTheme.title(_ware_name(w), 17, _ware_color(w) if not w.sold else UiTheme.GREY)
+	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	n.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(n)
+	var p := UiTheme.title(_price_text(w), 17, _price_color(w), HORIZONTAL_ALIGNMENT_RIGHT)
+	p.custom_minimum_size = Vector2(64, 0)
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(p)
+	_hookup(b, i)
+	return b
+
+
+func _tile(i: int) -> Button:
+	var w: Dictionary = stock[i]
+	var sel := i == selected
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(150, 64)
+	b.add_theme_stylebox_override("normal", _flat(Color(0.16, 0.13, 0.08, 0.95) if sel else Color(0.08, 0.075, 0.07, 0.85), UiTheme.GOLD if sel else Color(0, 0, 0, 0)))
+	b.add_theme_stylebox_override("hover", _flat(Color(0.13, 0.11, 0.09, 0.95), UiTheme.GOLD if sel else UiTheme.GOLD_DARK))
+	b.add_theme_stylebox_override("pressed", _flat(Color(0.18, 0.14, 0.08, 0.95), UiTheme.GOLD))
+	var h := HBoxContainer.new()
+	h.set_anchors_preset(Control.PRESET_FULL_RECT)
+	h.offset_left = 10
+	h.offset_right = -8
+	h.add_theme_constant_override("separation", 8)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(h)
+	var ic := UiTheme.pix(_ware_icon(w), 1.0)
+	if w.sold:
+		ic.modulate = Color(0.35, 0.35, 0.35)
+	h.add_child(ic)
+	var tv := VBoxContainer.new()
+	tv.alignment = BoxContainer.ALIGNMENT_CENTER
+	tv.add_theme_constant_override("separation", 0)
+	tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(tv)
+	var n := UiTheme.label(_ware_name(w), 14, UiTheme.CREAM if not w.sold else UiTheme.GREY)
+	tv.add_child(n)
+	tv.add_child(UiTheme.title(_price_text(w), 15, _price_color(w)))
+	_hookup(b, i)
 	return b
 
 
@@ -376,18 +449,17 @@ func _show_details() -> void:
 		"mend":
 			d_owned.text = "Health %d / %d" % [int(player.hp), int(player.max_hp)]
 			d_desc.text = "Grizzle patches you up. Restores all of your health right now."
+		"torch":
+			d_owned.text = "Held in your off hand for the rest of the run"
+			d_desc.text = "A pitch-soaked torch for your left hand. Lights the darkness around you, and every Cleave sears foes for extra fire damage."
 		_:
 			var b: Dictionary = Boons.BOONS[w.id]
 			d_owned.text = "Owned %d / %d" % [int(player.boons.get(w.id, 0)), int(b.max)]
 			d_desc.text = str(b.desc)
-	if w.sold:
-		d_price.text = "SOLD"
-		d_price.add_theme_color_override("font_color", UiTheme.GREY)
-	else:
-		d_price.text = "%d gold" % int(w.price)
-		d_price.add_theme_color_override("font_color", UiTheme.GOLD if player.gold >= int(w.price) else UiTheme.RED)
+	d_price.text = _price_text(w) if w.sold else "%d gold" % int(w.price)
+	d_price.add_theme_color_override("font_color", _price_color(w))
 	buy_btn.disabled = not _can_buy(w)
-	buy_btn.text = "BUY" if not w.sold else "SOLD OUT"
+	buy_btn.text = "BUY" if not w.sold else "SOLD"
 
 
 func _buy(i: int) -> void:
@@ -403,6 +475,8 @@ func _buy(i: int) -> void:
 			w.sold = player.potions >= player.max_potions
 		"mend":
 			player.heal(player.max_hp)
+		"torch":
+			player.equip_torch()
 		_:
 			player.apply_boon(w.id)
 	director.stat_add("gold_spent", float(w.price))

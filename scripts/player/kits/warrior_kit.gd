@@ -64,7 +64,7 @@ func _cleave_hit() -> void:
 	var hits: Array = player.enemies_in_cone(player.global_position, player.forward(), reach, min_dot)
 	var gained := 0.0
 	for e in hits:
-		var dmg: float = player.compute_damage(36.0, e)
+		var dmg: float = player.compute_damage(36.0 + (10.0 if player.has_torch else 0.0), e)
 		e.hurt(dmg, player.global_position, 5.0, player)
 		gained += 7.0
 		if player.mods.cleave_heal > 0.0:
