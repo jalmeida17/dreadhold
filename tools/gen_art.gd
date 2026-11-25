@@ -14,6 +14,7 @@ const Npc := preload("res://tools/art/npc.gd")
 const Bosses2 := preload("res://tools/art/bosses2.gd")
 const Tex2 := preload("res://tools/art/textures2.gd")
 const Props2 := preload("res://tools/art/props2.gd")
+const Champions := preload("res://tools/art/champions.gd")
 
 var previews := {}
 
@@ -43,6 +44,9 @@ func _init() -> void:
 	if all or "ui" in only:
 		gen_ui()
 		print("  [t] ui %d ms" % (Time.get_ticks_msec() - t0))
+	if all or "champions" in only:
+		gen_champions()
+		print("  [t] champions %d ms" % (Time.get_ticks_msec() - t0))
 	write_previews()
 	print("gen_art done in %d ms" % (Time.get_ticks_msec() - t0))
 	quit()
@@ -160,6 +164,27 @@ func gen_bosses() -> void:
 		save(Bosses2.portrait(k), "res://assets/ui/portrait_boss_%s.png" % k, "boss_portraits")
 
 
+func gen_champions() -> void:
+	## Co-op partner billboards (one 8-frame 96x96 strip per class) + a comparison preview
+	## against two enemy sheets (tools/preview/champions_vs_enemies.png).
+	print("[champions]")
+	for k in ["warrior", "mage", "hunter"]:
+		var sheet := Champions.build_sheet(k)
+		save(sheet, "res://assets/sprites/players/%s.png" % k, "champions")
+		print("    rows ", Champions.bounds_report(sheet))
+	for e in ["skeleton", "cultist"]:
+		var path := ProjectSettings.globalize_path("res://assets/sprites/enemies/%s.png" % e)
+		if FileAccess.file_exists(path):
+			if not previews.has("champions_vs_enemies"):
+				previews["champions_vs_enemies"] = []
+			var eimg := Image.load_from_file(path)
+			previews["champions_vs_enemies"].append(eimg)
+			print("    %s rows " % e, Champions.bounds_report(eimg))
+	if previews.has("champions_vs_enemies"):
+		for im in previews["champions"]:
+			previews["champions_vs_enemies"].append(im)
+
+
 func gen_ui() -> void:
 	print("[ui]")
 	var fa := UIArt.font_atlas()
@@ -195,7 +220,7 @@ func write_previews() -> void:
 	f.close()
 	for group in previews:
 		var imgs: Array = previews[group]
-		var scale: int = {"enemies": 2, "enemies_big": 1, "bosses": 1, "weapons_tiers": 1, "textures2": 2, "props2": 2, "weapons": 1, "textures": 2, "props": 2, "fx": 2}.get(group, 3)
+		var scale: int = {"champions_vs_enemies": 2, "enemies": 2, "enemies_big": 1, "bosses": 1, "weapons_tiers": 1, "textures2": 2, "props2": 2, "weapons": 1, "textures": 2, "props": 2, "fx": 2}.get(group, 3)
 		var maxw := 0
 		var total_h := 0
 		var flow: bool = group in ["icons", "portraits", "props", "fx", "ui", "textures", "textures2", "props2", "boss_portraits"]
