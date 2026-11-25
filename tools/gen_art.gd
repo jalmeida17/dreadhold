@@ -11,6 +11,9 @@ const UIArt := preload("res://tools/art/ui_art.gd")
 const Weapons := preload("res://tools/art/weapons_fp.gd")
 const Props := preload("res://tools/art/props_real.gd")
 const Npc := preload("res://tools/art/npc.gd")
+const Bosses2 := preload("res://tools/art/bosses2.gd")
+const Tex2 := preload("res://tools/art/textures2.gd")
+const Props2 := preload("res://tools/art/props2.gd")
 
 var previews := {}
 
@@ -31,6 +34,12 @@ func _init() -> void:
 	if all or "items" in only:
 		gen_items()
 		print("  [t] items %d ms" % (Time.get_ticks_msec() - t0))
+	if all or "mappack" in only:
+		gen_mappack()
+		print("  [t] mappack %d ms" % (Time.get_ticks_msec() - t0))
+	if all or "bosses" in only:
+		gen_bosses()
+		print("  [t] bosses %d ms" % (Time.get_ticks_msec() - t0))
 	if all or "ui" in only:
 		gen_ui()
 		print("  [t] ui %d ms" % (Time.get_ticks_msec() - t0))
@@ -104,12 +113,51 @@ func gen_items() -> void:
 	save(Weapons.axe_frames(), "res://assets/weapons/axe.png", "weapons")
 	save(Weapons.staff_frames(), "res://assets/weapons/staff.png", "weapons")
 	save(Weapons.bow_frames(), "res://assets/weapons/bow.png", "weapons")
+	for tier in [2, 3]:
+		save(Weapons.axe_frames(tier), "res://assets/weapons/axe_%d.png" % tier, "weapons_tiers")
+		save(Weapons.staff_frames(tier), "res://assets/weapons/staff_%d.png" % tier, "weapons_tiers")
+		save(Weapons.bow_frames(tier), "res://assets/weapons/bow_%d.png" % tier, "weapons_tiers")
+	save(Weapons.torch_offhand_frames(), "res://assets/weapons/torch_offhand.png", "weapons_tiers")
 	for k in ["warrior", "mage", "hunter"]:
 		save(Props.portrait_sheet(k), "res://assets/ui/portrait_%s.png" % k, "portraits")
 	save(Props.boss_portrait(), "res://assets/ui/portrait_boss.png", "portraits")
 	save(Props.pedestal(), "res://assets/sprites/props/pedestal.png", "props")
 	save(Npc.goblin_sheet(), "res://assets/sprites/npc/goblin.png", "npc")
 	save(Npc.goblin_portrait(), "res://assets/ui/portrait_goblin.png", "portraits")
+
+
+func gen_mappack() -> void:
+	print("[mappack]")
+	save(Tex2.wall_wood(51), "res://assets/textures/wall_wood.png", "textures2")
+	save(Tex2.wall_cathedral(52), "res://assets/textures/wall_cathedral.png", "textures2")
+	save(Tex2.wall_bone(53), "res://assets/textures/wall_bone.png", "textures2")
+	save(Tex2.wall_ice(54), "res://assets/textures/wall_ice.png", "textures2")
+	var obs := Tex2.wall_obsidian(55)
+	save(obs[0], "res://assets/textures/wall_obsidian.png", "textures2")
+	save(obs[1], "res://assets/textures/wall_obsidian_emit.png", "textures2")
+	save(Tex2.floor_marble(61), "res://assets/textures/floor_marble.png", "textures2")
+	save(Tex2.floor_snow(62), "res://assets/textures/floor_snow.png", "textures2")
+	var lava := Tex2.floor_lava(63)
+	save(lava[0], "res://assets/textures/floor_lava.png", "textures2")
+	save(lava[1], "res://assets/textures/floor_lava_emit.png", "textures2")
+	save(Tex2.floor_sludge(64), "res://assets/textures/floor_sludge.png", "textures2")
+	save(Tex2.ceiling_stone(65), "res://assets/textures/ceiling_stone.png", "textures2")
+	save(Props2.sarcophagus(), "res://assets/sprites/props/sarcophagus.png", "props2")
+	save(Props2.well(), "res://assets/sprites/props/well.png", "props2")
+	save(Props2.fence(), "res://assets/sprites/props/fence.png", "props2")
+	save(Props2.crystal(), "res://assets/sprites/props/crystal.png", "props2")
+	save(Props2.obsidian_spike(), "res://assets/sprites/props/obsidian_spike.png", "props2")
+	save(Props2.candles_sheet(), "res://assets/sprites/props/candles.png", "props2")
+	save(Props2.cauldron_sheet(), "res://assets/sprites/props/cauldron.png", "props2")
+	save(Props2.acid_pool(), "res://assets/sprites/fx/acid_pool.png", "props2")
+	save(Props2.meteor_sheet(), "res://assets/sprites/fx/meteor.png", "props2")
+
+
+func gen_bosses() -> void:
+	print("[bosses]")
+	for k in ["rot", "cinder", "rime"]:
+		save(Bosses2.build_sheet(k), "res://assets/sprites/enemies/boss_%s.png" % k, "bosses")
+		save(Bosses2.portrait(k), "res://assets/ui/portrait_boss_%s.png" % k, "boss_portraits")
 
 
 func gen_ui() -> void:
@@ -147,10 +195,10 @@ func write_previews() -> void:
 	f.close()
 	for group in previews:
 		var imgs: Array = previews[group]
-		var scale: int = {"enemies": 2, "enemies_big": 1, "weapons": 1, "textures": 2, "props": 2, "fx": 2}.get(group, 3)
+		var scale: int = {"enemies": 2, "enemies_big": 1, "bosses": 1, "weapons_tiers": 1, "textures2": 2, "props2": 2, "weapons": 1, "textures": 2, "props": 2, "fx": 2}.get(group, 3)
 		var maxw := 0
 		var total_h := 0
-		var flow: bool = group in ["icons", "portraits", "props", "fx", "ui", "textures"]
+		var flow: bool = group in ["icons", "portraits", "props", "fx", "ui", "textures", "textures2", "props2", "boss_portraits"]
 		var sheet: Image
 		if flow:
 			# wrap images in rows up to 1200px wide

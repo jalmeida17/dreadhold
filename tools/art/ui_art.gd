@@ -365,6 +365,11 @@ static func icon(name: String) -> Image:
 				var a := float(k) / 20.0 * TAU
 				p.ball(12 + cos(a) * 7.5, 12 + sin(a) * 7.5, 1.3, 1.3, Color(1, 0.7, 0.3))
 			glows = [[Vector2(12, 12), 5.0, Color(1, 0.6, 0.2), 0.8]]
+		"torch":
+			bg = Color(0.45, 0.2, 0.05)
+			p.capsule(Vector2(7, 21), Vector2(13, 10), 1.6, 1.9, Color(0.42, 0.25, 0.12))
+			p.capsule(Vector2(12, 12), Vector2(15, 8), 2.6, 2.4, Color(0.3, 0.22, 0.15))
+			glows = [[Vector2(15, 7), 7.0, Color(1.0, 0.55, 0.15), 0.9], [Vector2(15, 6), 3.5, Color(1.0, 0.95, 0.6), 1.0]]
 		"skull":
 			bg = Color(0.15, 0.15, 0.15)
 			p.ball(12, 10, 6, 6, Color(0.86, 0.81, 0.64))

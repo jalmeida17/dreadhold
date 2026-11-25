@@ -518,3 +518,34 @@ static func cursor(hover: bool) -> Image:
 	if hover:
 		p.glow(3.0, 3.0, 4.0, Color(1.0, 0.85, 0.4), 0.9)
 	return p.img
+
+
+static func sky_variant(seed_value: int, base: Color, aur_a: Color, aur_b: Color, ground: Color, stars: float) -> Image:
+	## Equirectangular boss-arena sky: tinted aurora/haze bands over a dark base (2048x1024).
+	var w := 2048
+	var h := 1024
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var n := FastNoiseLite.new()
+	n.seed = seed_value
+	n.frequency = 1.3
+	n.fractal_octaves = 4
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	for y in h:
+		var v := float(y) / float(h)
+		for x in w:
+			var ang := float(x) / float(w) * TAU
+			var c := base
+			if v < 0.55:
+				var aur := n.get_noise_3d(cos(ang) * 1.5, sin(ang) * 1.5, v * 4.0) * 0.5 + 0.5
+				var band := smoothstep(0.08, 0.3, v) * (1.0 - smoothstep(0.38, 0.54, v))
+				var a := clampf((aur - 0.42) * 2.4, 0.0, 1.0) * band
+				c = base.lerp(aur_a, a * 0.75).lerp(aur_b, a * a * 0.5)
+				c = c.lerp(ground, smoothstep(0.4, 0.55, v) * 0.6)
+				if rng.randf() < stars * (1.0 - v):
+					c = Color(0.9, 0.9, 0.95) * rng.randf_range(0.4, 1.0)
+			else:
+				c = ground.lerp(Color(0, 0, 0), clampf((v - 0.55) * 2.2, 0.0, 1.0))
+			c.a = 1.0
+			img.set_pixel(x, y, c)
+	return img

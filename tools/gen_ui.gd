@@ -16,7 +16,7 @@ func _init() -> void:
 	print("gen_ui start")
 	_save(UIArt.logo("DREADHOLD"), "res://assets/ui/logo.png")
 	for n in ["cleave", "spin", "charge", "fireball", "frostnova", "blink", "shot", "volley", "dash", "potion",
-			"damage", "health", "speed", "cooldown", "regen", "lifesteal", "crit", "armor", "resource", "gold", "area", "skull"]:
+			"damage", "health", "speed", "cooldown", "regen", "lifesteal", "crit", "armor", "resource", "gold", "area", "skull", "torch"]:
 		_save(UIArt.icon(n), "res://assets/ui/icons/%s.png" % n)
 	_save(UIArt.app_icon(), "res://assets/ui/icon.png")
 	for c in ["warrior", "mage", "hunter"]:
@@ -50,6 +50,9 @@ func _init() -> void:
 	_save(W3.magic_circle(), "res://assets/sprites/fx/magic_circle.png")
 	var sky := W3.sky_void()
 	Painter.save_image(sky, "res://assets/textures/sky_void.png")
+	Painter.save_image(W3.sky_variant(1101, Color(0.03, 0.035, 0.01), Color(0.55, 0.65, 0.15), Color(0.3, 0.35, 0.08), Color(0.12, 0.14, 0.04), 0.0005), "res://assets/textures/sky_rot.png")
+	Painter.save_image(W3.sky_variant(1102, Color(0.06, 0.005, 0.005), Color(0.9, 0.3, 0.05), Color(0.45, 0.04, 0.04), Color(0.3, 0.06, 0.02), 0.0), "res://assets/textures/sky_hell.png")
+	Painter.save_image(W3.sky_variant(1103, Color(0.03, 0.05, 0.1), Color(0.4, 0.75, 0.95), Color(0.55, 0.45, 0.9), Color(0.25, 0.32, 0.42), 0.0025), "res://assets/textures/sky_frost.png")
 	_contact_sheet()
 	print("gen_ui done in %d ms" % (Time.get_ticks_msec() - t0))
 	quit()

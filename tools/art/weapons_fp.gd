@@ -5,6 +5,7 @@ extends RefCounted
 
 const Painter := preload("res://tools/art/painter.gd")
 const Items := preload("res://tools/art/items.gd")
+const PR := preload("res://tools/art/props_real.gd")
 const GOLD := Color(0.6, 0.47, 0.22)
 const STEEL := Color(0.5, 0.52, 0.56)
 const DARK_STEEL := Color(0.3, 0.31, 0.34)
@@ -99,7 +100,7 @@ static func _gauntlet(p: Painter, grip: Vector2, d: Vector2, arm_dir: Vector2) -
 
 # =============================================================================== axe
 
-static func axe_frames() -> Image:
+static func axe_frames(tier: int = 1) -> Image:
 	# [grip, head, smear]
 	var poses := [
 		[Vector2(98, 82), Vector2(68, 22), false],
@@ -109,7 +110,7 @@ static func axe_frames() -> Image:
 	]
 	var frames: Array = []
 	for i in poses.size():
-		var p := _new(400 + i)
+		var p := _new(400 + i + (tier - 1) * 50)
 		var grip: Vector2 = poses[i][0]
 		var head: Vector2 = poses[i][1]
 		var d := (head - grip).normalized()
@@ -123,44 +124,49 @@ static func axe_frames() -> Image:
 				var a := lerpf(-0.35, 1.9, t)
 				var pc := Vector2(76, 118) + Vector2(cos(a + PI), sin(a + PI)) * Vector2(84, 94)
 				p.glow(pc.x, pc.y, 6.0 + t * 5.0, Color(0.55, 0.57, 0.62), 0.1 + t * 0.12)
-		# haft: wood with grain, leather grip, iron langets near the head
-		_wood_haft(p, grip - d * 40.0, head + d * 10.0, 3.6)
-		_leather_wrap(p, grip - d * 12.0, grip + d * 16.0, 4.0, 9)
-		p.spec = 0.5
-		p.capsule(head - d * 16.0 + n * 3.2, head + d * 4.0 + n * 3.2, 0.9, 0.9, DARK_STEEL)
-		p.capsule(head - d * 16.0 - n * 3.2, head + d * 4.0 - n * 3.2, 0.9, 0.9, DARK_STEEL)
-		p.spec = 0.0
-		# bearded blade
-		var s := 1.3
-		var loc := func(u: float, v: float) -> Vector2: return head + (d * u + n * v) * s
-		var blade := PackedVector2Array([loc.call(5, 2.5), loc.call(5, 7), loc.call(10.5, 13), loc.call(12.5, 23), loc.call(6.5, 27.5), loc.call(-4, 28.8), loc.call(-14, 27), loc.call(-24, 21), loc.call(-17, 14), loc.call(-9, 8.5), loc.call(-5, 2.5)])
-		p.spec = 0.9
-		p.shininess = 26.0
-		p.spec = 0.45
-		p.grad_poly(blade, STEEL, head, n, 29.0 * s, 0.32, 0.82, 7.0)
-		var edge := PackedVector2Array([loc.call(12.5, 23), loc.call(6.5, 27.5), loc.call(-4, 28.8), loc.call(-14, 27), loc.call(-24, 21), loc.call(-21, 19.5), loc.call(-13, 23.8), loc.call(-4, 25.4), loc.call(5.5, 24.2), loc.call(10.5, 20.5)])
-		p.grad_poly(edge, STEEL, loc.call(0, 23), n, 6.0 * s, 0.9, 1.15, 3.0)
-		p.spec = 0.0
-		p.shininess = 18.0
-		# scratches & etched rune line
-		var rng := RandomNumberGenerator.new()
-		rng.seed = 77
-		for kk in 9:
-			var u := rng.randf_range(-16, 8)
-			var v := rng.randf_range(6, 24)
-			var a2: Vector2 = loc.call(u, v)
-			var b2: Vector2 = loc.call(u + rng.randf_range(2, 6), v + rng.randf_range(-1.5, 1.5))
-			p.line(a2, b2, STEEL.darkened(0.35) if kk % 2 == 0 else STEEL.lightened(0.2), 0.5)
-		p.line(loc.call(8, 20.5), loc.call(-15, 22.5), DARK_STEEL.darkened(0.2), 0.6)
-		for kk in 0:
-			var u2 := 2.0 - kk * 4.5
-			p.line(loc.call(u2, 6.5), loc.call(u2 - 1.5, 10), DARK_STEEL.darkened(0.4), 0.6)
-		# socket + hammer poll
-		p.spec = 0.6
-		p.flat_poly(PackedVector2Array([loc.call(6, 3), loc.call(6, -3), loc.call(-7, -3), loc.call(-7, 3)]), DARK_STEEL, Vector3(0.3, 0.2, 1))
-		p.flat_poly(PackedVector2Array([loc.call(3.5, -3), loc.call(3.5, -7.5), loc.call(-4.5, -7.5), loc.call(-4.5, -3)]), DARK_STEEL.lightened(0.1), Vector3(0.4, 0.1, 1))
-		p.capsule(loc.call(7.5, 3.5), loc.call(7.5, -3.5), 1.1, 1.1, GOLD)
-		p.spec = 0.0
+		if tier == 1:
+			# haft: wood with grain, leather grip, iron langets near the head
+			_wood_haft(p, grip - d * 40.0, head + d * 10.0, 3.6)
+			_leather_wrap(p, grip - d * 12.0, grip + d * 16.0, 4.0, 9)
+			p.spec = 0.5
+			p.capsule(head - d * 16.0 + n * 3.2, head + d * 4.0 + n * 3.2, 0.9, 0.9, DARK_STEEL)
+			p.capsule(head - d * 16.0 - n * 3.2, head + d * 4.0 - n * 3.2, 0.9, 0.9, DARK_STEEL)
+			p.spec = 0.0
+			# bearded blade
+			var s := 1.3
+			var loc := func(u: float, v: float) -> Vector2: return head + (d * u + n * v) * s
+			var blade := PackedVector2Array([loc.call(5, 2.5), loc.call(5, 7), loc.call(10.5, 13), loc.call(12.5, 23), loc.call(6.5, 27.5), loc.call(-4, 28.8), loc.call(-14, 27), loc.call(-24, 21), loc.call(-17, 14), loc.call(-9, 8.5), loc.call(-5, 2.5)])
+			p.spec = 0.9
+			p.shininess = 26.0
+			p.spec = 0.45
+			p.grad_poly(blade, STEEL, head, n, 29.0 * s, 0.32, 0.82, 7.0)
+			var edge := PackedVector2Array([loc.call(12.5, 23), loc.call(6.5, 27.5), loc.call(-4, 28.8), loc.call(-14, 27), loc.call(-24, 21), loc.call(-21, 19.5), loc.call(-13, 23.8), loc.call(-4, 25.4), loc.call(5.5, 24.2), loc.call(10.5, 20.5)])
+			p.grad_poly(edge, STEEL, loc.call(0, 23), n, 6.0 * s, 0.9, 1.15, 3.0)
+			p.spec = 0.0
+			p.shininess = 18.0
+			# scratches & etched rune line
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 77
+			for kk in 9:
+				var u := rng.randf_range(-16, 8)
+				var v := rng.randf_range(6, 24)
+				var a2: Vector2 = loc.call(u, v)
+				var b2: Vector2 = loc.call(u + rng.randf_range(2, 6), v + rng.randf_range(-1.5, 1.5))
+				p.line(a2, b2, STEEL.darkened(0.35) if kk % 2 == 0 else STEEL.lightened(0.2), 0.5)
+			p.line(loc.call(8, 20.5), loc.call(-15, 22.5), DARK_STEEL.darkened(0.2), 0.6)
+			for kk in 0:
+				var u2 := 2.0 - kk * 4.5
+				p.line(loc.call(u2, 6.5), loc.call(u2 - 1.5, 10), DARK_STEEL.darkened(0.4), 0.6)
+			# socket + hammer poll
+			p.spec = 0.6
+			p.flat_poly(PackedVector2Array([loc.call(6, 3), loc.call(6, -3), loc.call(-7, -3), loc.call(-7, 3)]), DARK_STEEL, Vector3(0.3, 0.2, 1))
+			p.flat_poly(PackedVector2Array([loc.call(3.5, -3), loc.call(3.5, -7.5), loc.call(-4.5, -7.5), loc.call(-4.5, -3)]), DARK_STEEL.lightened(0.1), Vector3(0.4, 0.1, 1))
+			p.capsule(loc.call(7.5, 3.5), loc.call(7.5, -3.5), 1.1, 1.1, GOLD)
+			p.spec = 0.0
+		elif tier == 2:
+			_axe_reaver(p, grip, head, d, n)
+		else:
+			_axe_doom(p, grip, head, d, n, i)
 		_gauntlet(p, grip, d, Vector2(30, 32))
 		_finish(p)
 		frames.append(p.img)
@@ -169,7 +175,7 @@ static func axe_frames() -> Image:
 
 # =============================================================================== staff
 
-static func staff_frames() -> Image:
+static func staff_frames(tier: int = 1) -> Image:
 	var poses := [
 		[Vector2(96, 78), Vector2(76, 12), Items.FIRE, 0.7],
 		[Vector2(86, 74), Vector2(62, 8), Items.FIRE, 1.5],
@@ -178,36 +184,43 @@ static func staff_frames() -> Image:
 	]
 	var frames: Array = []
 	for i in poses.size():
-		var p := _new(420 + i)
+		var p := _new(420 + i + (tier - 1) * 50)
 		var grip: Vector2 = poses[i][0]
 		var top: Vector2 = poses[i][1]
 		var pal: Array = poses[i][2]
+		if tier == 2 and i < 3:
+			pal = MOON
 		var power: float = poses[i][3]
 		var d := (top - grip).normalized()
 		var n := Vector2(-d.y, d.x)
 		var wood := Color(0.27, 0.19, 0.13)
-		# gnarled shaft
-		var pts := PackedVector2Array()
-		for kk in 14:
-			var t := float(kk) / 13.0
-			pts.append((grip - d * 44.0).lerp(top - d * 9.0, t) + n * (sin(t * 13.0) * 1.4 + sin(t * 5.0) * 0.8))
-		p.strand(pts, 5.0, 3.4, wood, 0.25)
-		for kk in 4:
-			var t := 0.25 + kk * 0.18
-			var bp := (grip - d * 44.0).lerp(top - d * 9.0, t)
-			p.ball(bp.x + n.x * 2.2, bp.y + n.y * 2.2, 2.4, 1.8, wood.darkened(0.1))
-			p.line(bp - n * 2.5 - d * 4.0, bp + n * 1.5 + d * 6.0, wood.darkened(0.5), 0.5)
-		# root claws holding the crystal
-		for side in [-1.0, -0.35, 0.35, 1.0]:
-			var sd: float = side
-			var c0: Vector2 = top - d * 11.0 + n * sd * 2.0
-			var c1: Vector2 = top + n * sd * 9.5 - d * 2.5
-			var c2: Vector2 = top + n * sd * 5.0 + d * 8.5
-			p.strand(PackedVector2Array([c0, c1, c2]), 2.2, 0.7, wood.lightened(0.04))
-		p.spec = 0.6
-		p.capsule(top - d * 15.0 - n * 4.8, top - d * 15.0 + n * 4.8, 1.8, 1.8, GOLD)
-		p.capsule(top - d * 19.0 - n * 4.2, top - d * 19.0 + n * 4.2, 1.3, 1.3, GOLD.darkened(0.2))
-		p.spec = 0.0
+		if tier == 1:
+			# gnarled shaft
+			var pts := PackedVector2Array()
+			for kk in 14:
+				var t := float(kk) / 13.0
+				pts.append((grip - d * 44.0).lerp(top - d * 9.0, t) + n * (sin(t * 13.0) * 1.4 + sin(t * 5.0) * 0.8))
+			p.strand(pts, 5.0, 3.4, wood, 0.25)
+			for kk in 4:
+				var t := 0.25 + kk * 0.18
+				var bp := (grip - d * 44.0).lerp(top - d * 9.0, t)
+				p.ball(bp.x + n.x * 2.2, bp.y + n.y * 2.2, 2.4, 1.8, wood.darkened(0.1))
+				p.line(bp - n * 2.5 - d * 4.0, bp + n * 1.5 + d * 6.0, wood.darkened(0.5), 0.5)
+			# root claws holding the crystal
+			for side in [-1.0, -0.35, 0.35, 1.0]:
+				var sd: float = side
+				var c0: Vector2 = top - d * 11.0 + n * sd * 2.0
+				var c1: Vector2 = top + n * sd * 9.5 - d * 2.5
+				var c2: Vector2 = top + n * sd * 5.0 + d * 8.5
+				p.strand(PackedVector2Array([c0, c1, c2]), 2.2, 0.7, wood.lightened(0.04))
+			p.spec = 0.6
+			p.capsule(top - d * 15.0 - n * 4.8, top - d * 15.0 + n * 4.8, 1.8, 1.8, GOLD)
+			p.capsule(top - d * 19.0 - n * 4.2, top - d * 19.0 + n * 4.2, 1.3, 1.3, GOLD.darkened(0.2))
+			p.spec = 0.0
+		elif tier == 2:
+			_staff_moon_shaft(p, grip, top, d, n)
+		else:
+			_staff_eye_shaft(p, grip, top, d, n)
 		# heavy robe sleeve with worn trim
 		var sleeve := Color(0.17, 0.17, 0.32)
 		p.capsule(grip + Vector2(2, 6), grip + Vector2(64, 66), 12.5, 19.0, sleeve)
@@ -224,22 +237,25 @@ static func staff_frames() -> Image:
 			p.line(fp + n * 5.0 - d * 1.6, fp + n * 5.0 + d * 1.6, SKIN.darkened(0.45), 0.5)
 		p.capsule(grip + n * 8.0 - d * 8.0, grip - d * 9.5 - n * 2.0, 2.8, 2.4, SKIN)
 		_finish(p)
-		# crystal (faceted) with magic inside
-		var cr := top + d * 1.0
-		p.glow(cr.x, cr.y, 20.0 * power, pal[1], 0.5 * power)
-		var crp := p.tp(cr)
-		Items.orb(p, crp.x, crp.y, (5.0 + power * 2.0) * p.k, float(i) * 1.3, pal)
-		p.spec = 1.0
-		var facets := [[0.0, -7.0], [5.0, -2.0], [4.0, 5.5], [-4.0, 5.5], [-5.0, -2.0]]
-		for fi in facets.size():
-			var f0: Array = facets[fi]
-			var f1: Array = facets[(fi + 1) % facets.size()]
-			p.line(cr + Vector2(f0[0], f0[1]), cr + Vector2(f1[0], f1[1]), Color(1, 1, 1, 0.35), 0.6)
-		p.spec = 0.0
-		if power > 1.0:
-			for kk in 10:
-				var a := float(kk) / 10.0 * TAU + i
-				p.glow(cr.x + cos(a) * 17, cr.y + sin(a) * 17, 2.6, pal[2], 0.9)
+		if tier < 3:
+			# crystal (faceted) with magic inside
+			var cr := top + d * 1.0
+			p.glow(cr.x, cr.y, 20.0 * power, pal[1], 0.5 * power)
+			var crp := p.tp(cr)
+			Items.orb(p, crp.x, crp.y, (5.0 + power * 2.0) * p.k, float(i) * 1.3, pal)
+			p.spec = 1.0
+			var facets := [[0.0, -7.0], [5.0, -2.0], [4.0, 5.5], [-4.0, 5.5], [-5.0, -2.0]]
+			for fi in facets.size():
+				var f0: Array = facets[fi]
+				var f1: Array = facets[(fi + 1) % facets.size()]
+				p.line(cr + Vector2(f0[0], f0[1]), cr + Vector2(f1[0], f1[1]), Color(1, 1, 1, 0.35), 0.6)
+			p.spec = 0.0
+			if power > 1.0:
+				for kk in 10:
+					var a := float(kk) / 10.0 * TAU + i
+					p.glow(cr.x + cos(a) * 17, cr.y + sin(a) * 17, 2.6, pal[2], 0.9)
+		else:
+			_staff_eye_orb(p, top, d, pal, power, i)
 		frames.append(p.img)
 	return Painter.strip(frames)
 
@@ -438,7 +454,8 @@ static func _released_hand(p: Painter, at: Vector2, u: Vector2) -> void:
 	_tcapsule(p, tb, tb - pu * 15.0 + u * 7.0, 4.4, GLOVE_T)
 
 
-static func bow_frames() -> Image:
+static func bow_frames(tier: int = 1) -> Image:
+	## tier 1: yew longbow; 2: "Hornbow of the Wilds"; 3: "Wyrmbone Greatbow".
 	var wood := Color(0.31, 0.2, 0.12)
 	var u := (AIM - REST).normalized()
 	var axis := Vector2(-0.3, -1.0).normalized()   # bow axis, upper limb leaning left
@@ -447,41 +464,115 @@ static func bow_frames() -> Image:
 		left = -left
 	var frames: Array = []
 	for i in 3:
-		var p := Painter.new(FW, FH, 440 + i)
+		var p := Painter.new(FW, FH, 440 + i + (tier - 1) * 50)
 		p.set_real(1.0)
 		p.grain = 0.08
 		var draw: float = [80.0, 150.0, 0.0][i]
-		var bend := 34.0 + draw * 0.08
+		var bend: float = [34.0, 30.0, 38.0][tier - 1] + draw * 0.08
 		var grip := REST + Vector2(4, 14)
 		var mid := grip - left * 4.0
-		var half := 225.0
+		var half: float = [225.0, 182.0, 255.0][tier - 1]
 		var top_tip := mid + axis * half - left * bend + (-u) * draw * 0.06
 		var bot_tip := mid - axis * half - left * bend + (-u) * draw * 0.06
 		var nock := REST - u * draw
 		# string (behind the limbs and hands)
-		var sc := Color(0.8, 0.78, 0.7)
+		var sc := Color(0.8, 0.78, 0.7) if tier < 3 else Color(0.55, 1.0, 0.62)
 		if i == 2:
 			p.line(top_tip, bot_tip, sc, 1.3)
-			p.line(top_tip + left * 3.0, bot_tip + left * 3.0, Color(0.8, 0.78, 0.7, 0.35), 1.0)
+			p.line(top_tip + left * 3.0, bot_tip + left * 3.0, Color(sc.r, sc.g, sc.b, 0.35), 1.0)
 		else:
 			p.line(top_tip, nock, sc, 1.3)
 			p.line(nock, bot_tip, sc, 1.3)
-		# laminated limbs with horn tips
+		if tier == 3:
+			for kk in 9:
+				var t := float(kk) / 8.0
+				var sp := top_tip.lerp(nock if i < 2 else bot_tip, t) if t < 1.0 else nock
+				p.glow_px(sp.x, sp.y, 5.0, Color(0.4, 1.0, 0.5), 0.25)
+				if i < 2:
+					var sp2 := nock.lerp(bot_tip, t)
+					p.glow_px(sp2.x, sp2.y, 5.0, Color(0.4, 1.0, 0.5), 0.25)
+		# limbs
 		var lim := PackedVector2Array()
 		for kk in 25:
 			var t := float(kk) / 24.0
 			lim.append(top_tip.lerp(bot_tip, t) + left * sin(t * PI) * bend)
-		for kk in 24:
-			var t0 := float(kk) / 24.0
-			var thick := 5.5 + sin(t0 * PI) * 7.0
-			p.capsule(lim[kk], lim[kk + 1], thick, thick, wood)
-		for kk in 22:
-			p.line(lim[kk] - left * 3.0, lim[kk + 1] - left * 3.0, wood.lightened(0.16), 1.0)
-		for tip in [top_tip, bot_tip]:
-			var tv: Vector2 = tip
-			p.capsule(tv, tv - left * 8.0 + (Vector2(0, 5) if tv.y < 180 else Vector2(0, -5)), 4.0, 2.4, Color(0.55, 0.5, 0.42))
+		if tier == 1:
+			for kk in 24:
+				var t0 := float(kk) / 24.0
+				var thick := 5.5 + sin(t0 * PI) * 7.0
+				p.capsule(lim[kk], lim[kk + 1], thick, thick, wood)
+			for kk in 22:
+				p.line(lim[kk] - left * 3.0, lim[kk + 1] - left * 3.0, wood.lightened(0.16), 1.0)
+			for tip in [top_tip, bot_tip]:
+				var tv: Vector2 = tip
+				p.capsule(tv, tv - left * 8.0 + (Vector2(0, 5) if tv.y < 180 else Vector2(0, -5)), 4.0, 2.4, Color(0.55, 0.5, 0.42))
+		elif tier == 2:
+			var dark := Color(0.2, 0.13, 0.08)
+			var horn := Color(0.6, 0.55, 0.45)
+			for kk in 24:
+				var t0 := float(kk) / 24.0
+				var thick := 6.0 + sin(t0 * PI) * 6.5
+				p.capsule(lim[kk], lim[kk + 1], thick, thick, dark)
+			for kk in 24:
+				var t1 := float(kk) / 24.0
+				var th2 := (6.0 + sin(t1 * PI) * 6.5) * 0.45
+				p.capsule(lim[kk] - left * 3.5, lim[kk + 1] - left * 3.5, th2, th2, horn)
+			for kk in 6:
+				var bp := lim[3 + kk * 4]
+				p.line(bp - left * 7.0, bp + left * 7.0, dark.darkened(0.5), 1.0)
+			# recurved antler tips
+			for tip in [top_tip, bot_tip]:
+				var tv2: Vector2 = tip
+				var sgn := 1.0 if tv2.y < 180 else -1.0
+				var a0 := tv2
+				var a1 := tv2 + left * 14.0 + axis * sgn * 6.0
+				var a2 := a1 + left * 6.0 + axis * sgn * 15.0
+				p.strand(PackedVector2Array([a0, a1, a2]), 5.4, 1.4, Color(0.7, 0.66, 0.56))
+				p.strand(PackedVector2Array([a1, a1 - left * 4.0 + axis * sgn * 14.0]), 3.0, 0.8, Color(0.7, 0.66, 0.56))
+				p.strand(PackedVector2Array([a0 + left * 5.0, a0 + left * 15.0 - axis * sgn * 7.0]), 2.6, 0.7, Color(0.7, 0.66, 0.56))
+				p.strand(PackedVector2Array([a1 + left * 3.0 + axis * sgn * 7.0, a1 + left * 12.0 + axis * sgn * 9.0]), 2.2, 0.6, Color(0.7, 0.66, 0.56))
+			# feathers tied to the upper limb
+			var tie := lim[4]
+			p.line(tie, tie + left * 10.0 + Vector2(0, 26), Color(0.4, 0.32, 0.2), 1.0)
+			for fk in 3:
+				var fb := tie + left * (8.0 + fk * 4.0) + Vector2(0, 22 + fk * 5)
+				var fd := Vector2(0.25 * (fk - 1), 1.0).normalized()
+				var fcol: Color = [Color(0.85, 0.82, 0.75), Color(0.3, 0.24, 0.18), Color(0.5, 0.18, 0.12)][fk]
+				p.capsule(fb, fb + fd * 18.0, 1.0, 0.6, Color(0.9, 0.88, 0.8))
+				for vk in 7:
+					var vp := fb + fd * (3.0 + vk * 2.2)
+					var fn := Vector2(-fd.y, fd.x)
+					p.line(vp, vp + fn * 4.0 - fd * 2.0, fcol, 1.0)
+					p.line(vp, vp - fn * 4.0 - fd * 2.0, fcol.darkened(0.2), 1.0)
+		else:
+			# wyrmbone: segmented pale bone with joints, back spikes, glowing runes
+			for kk in 24:
+				var t0 := float(kk) / 24.0
+				var thick := 6.0 + sin(t0 * PI) * 7.5
+				p.capsule(lim[kk], lim[kk + 1], thick, thick * 0.92, BONE_W)
+			for kk in range(1, 24, 3):
+				var jp := lim[kk]
+				var jt := 7.0 + sin(float(kk) / 24.0 * PI) * 8.0
+				p.ball(jp.x, jp.y, jt, jt * 0.8, BONE_W.lightened(0.05))
+				p.line(jp - left * jt * 0.9, jp + left * jt * 0.9, BONE_W.darkened(0.45), 1.0)
+				var spk := jp + left * (jt + 1.0)
+				p.poly(PackedVector2Array([spk + axis * 3.0, spk + left * 9.0 + axis * 5.0, spk - axis * 3.0]), BONE_W.darkened(0.1))
+			for kk in [5, 9, 15, 19]:
+				var rp := lim[kk]
+				p.line(rp - axis * 4.0 - left * 2.0, rp + axis * 4.0 - left * 2.0, Color(0.5, 1.0, 0.55), 1.4)
+				p.line(rp - left * 2.0, rp + left * 2.0 + axis * 2.0, Color(0.5, 1.0, 0.55), 1.2)
+				p.glow_px(rp.x, rp.y, 7.0, Color(0.35, 1.0, 0.45), 0.4)
+			for tip in [top_tip, bot_tip]:
+				var tv3: Vector2 = tip
+				var sgn2 := 1.0 if tv3.y < 180 else -1.0
+				p.strand(PackedVector2Array([tv3, tv3 + left * 7.0 + axis * sgn2 * 6.0, tv3 + left * 3.0 + axis * sgn2 * 14.0]), 4.0, 0.8, BONE_W)
 		# leather grip wrap, then the bow hand around it
-		p.capsule(mid + axis * 20.0, mid - axis * 20.0, 10.0, 10.0, LEATHER.darkened(0.15))
+		var grip_col := LEATHER.darkened(0.15)
+		if tier == 2:
+			grip_col = Color(0.16, 0.25, 0.13)
+		elif tier == 3:
+			grip_col = Color(0.12, 0.1, 0.1)
+		p.capsule(mid + axis * 20.0, mid - axis * 20.0, 10.0, 10.0, grip_col)
 		_bow_fist(p, mid, axis, left)
 		# arrow on the aim line: nock -> rest -> broadhead just short of the crosshair
 		if i < 2:
@@ -500,5 +591,246 @@ static func bow_frames() -> Image:
 		else:
 			_released_hand(p, Vector2(500, 300), u)
 		_finish(p)
+		frames.append(p.img)
+	return Painter.strip(frames)
+
+
+# =============================================================================== upgrade tiers (2 & 3)
+
+const MOON := [Color(0.1, 0.15, 0.35), Color(0.38, 0.52, 0.86), Color(0.78, 0.87, 1.0), Color(0.97, 0.98, 1.0)]
+const BLACK_IRON := Color(0.16, 0.16, 0.18)
+const EMBER := Color(1.0, 0.45, 0.1)
+const EMBER_HOT := Color(1.0, 0.82, 0.4)
+const SILVER := Color(0.78, 0.8, 0.84)
+const BONE_W := Color(0.78, 0.74, 0.64)
+
+
+static func _glyph(p: Painter, loc: Callable, u: float, v: float, kind: int, sz: float, ink: Color) -> void:
+	## Bold engraved rune: dark groove first, coloured inlay on top. u runs along the haft.
+	var strokes: Array
+	match kind:
+		0:
+			strokes = [[0, -4, 0, 4], [0, -0.5, -2.6, -3.8], [0, -0.5, 2.6, -3.8]]
+		1:
+			strokes = [[0, -4, 2.6, -0.8], [2.6, -0.8, 0, 2.2], [0, 2.2, -2.6, -0.8], [-2.6, -0.8, 0, -4], [0, 2.2, -2.4, 4.6], [0, 2.2, 2.4, 4.6]]
+		_:
+			strokes = [[0, -4, 0, 4], [0, -4, -2.6, -1.2], [0, -4, 2.6, -1.2]]
+	for st in strokes:
+		var s0: Array = st
+		p.line(loc.call(u + s0[1] * sz, v + s0[0] * sz), loc.call(u + s0[3] * sz, v + s0[2] * sz), Color(0.08, 0.08, 0.1), 2.6)
+	for st in strokes:
+		var s1: Array = st
+		p.line(loc.call(u + s1[1] * sz, v + s1[0] * sz), loc.call(u + s1[3] * sz, v + s1[2] * sz), ink, 1.4)
+
+
+static func _axe_reaver(p: Painter, grip: Vector2, head: Vector2, d: Vector2, n: Vector2) -> void:
+	## "Reaver Greataxe": double-bitted dark-steel axe with bold gold runes.
+	## Kept to the base axe's on-screen footprint: main bit same reach, small back bit.
+	var steel := Color(0.38, 0.4, 0.45)
+	_wood_haft(p, grip - d * 42.0, head + d * 12.0, 3.8)
+	_leather_wrap(p, grip - d * 16.0, grip + d * 26.0, 4.2, 13)
+	p.spec = 0.7
+	for b in [32.0, 40.0, -22.0]:
+		var bf: float = b
+		p.capsule(grip + d * bf - n * 4.8, grip + d * bf + n * 4.8, 1.4, 1.4, DARK_STEEL)
+	var pm := grip - d * 43.0
+	p.ball(pm.x, pm.y, 4.6, 4.6, DARK_STEEL)
+	p.spec = 0.0
+	for sv in [1.0, -1.0]:
+		var side: float = sv
+		var sn := n * side
+		var sc := 1.3 if side > 0 else 0.78
+		var loc := func(u: float, v: float) -> Vector2: return head + (d * u + sn * v) * sc
+		var blade := PackedVector2Array([loc.call(6, 3), loc.call(9, 7), loc.call(14, 14), loc.call(15, 22.5), loc.call(8.5, 27.5), loc.call(0, 29), loc.call(-8.5, 27.5), loc.call(-15, 22.5), loc.call(-14, 14), loc.call(-9, 7), loc.call(-6, 3)])
+		p.spec = 0.5
+		p.shininess = 26.0
+		p.grad_poly(blade, steel, head, sn, 29.0 * sc, 0.3, 0.8, 7.0)
+		var edge := PackedVector2Array([loc.call(15, 22.5), loc.call(8.5, 27.5), loc.call(0, 29), loc.call(-8.5, 27.5), loc.call(-15, 22.5), loc.call(-13, 21), loc.call(-7.5, 25), loc.call(0, 26.3), loc.call(7.5, 25), loc.call(13, 21)])
+		p.grad_poly(edge, steel, loc.call(0, 23), sn, 5.0 * sc, 0.95, 1.22, 3.0)
+		p.spec = 0.0
+		p.shininess = 18.0
+		if side > 0:
+			_glyph(p, loc, -6.5, 15.0, 0, 1.0, GOLD.lightened(0.15))
+			_glyph(p, loc, 0.0, 17.0, 1, 1.0, GOLD.lightened(0.15))
+			_glyph(p, loc, 6.5, 15.0, 2, 1.0, GOLD.lightened(0.15))
+		else:
+			_glyph(p, loc, 0.0, 15.0, 1, 1.1, GOLD.lightened(0.15))
+	# socket with gold bands + short spear spike
+	p.spec = 0.7
+	p.flat_poly(PackedVector2Array([head + d * 8 + n * 4.6, head + d * 8 - n * 4.6, head - d * 8 - n * 4.6, head - d * 8 + n * 4.6]), DARK_STEEL, Vector3(0.3, 0.2, 1))
+	p.capsule(head + d * 5.5 + n * 5.0, head + d * 5.5 - n * 5.0, 1.3, 1.3, GOLD)
+	p.capsule(head - d * 5.5 + n * 5.0, head - d * 5.5 - n * 5.0, 1.3, 1.3, GOLD)
+	p.grad_poly(PackedVector2Array([head + d * 8 + n * 2.8, head + d * 18, head + d * 8 - n * 2.8]), steel, head + d * 8, n, 2.8, 0.5, 1.15, 3.0)
+	p.spec = 0.0
+
+
+static func _axe_doom(p: Painter, grip: Vector2, head: Vector2, d: Vector2, n: Vector2, frame: int) -> void:
+	## "Doomcleaver": black-iron cleaver-axe, jagged edge, glowing ember runes, skull pommel.
+	## Same on-screen footprint as the base axe.
+	p.spec = 0.7
+	p.capsule(grip - d * 42.0, head + d * 11.0, 4.4, 3.9, BLACK_IRON)
+	for r in 3:
+		var rp := grip + d * (24.0 + r * 8.0)
+		p.capsule(rp - n * 5.2, rp + n * 5.2, 1.2, 1.2, BLACK_IRON.lightened(0.12))
+	p.spec = 0.0
+	p.capsule(grip - d * 15.0, grip + d * 17.0, 4.8, 4.8, Color(0.2, 0.08, 0.06))
+	for k in 10:
+		var c := grip + d * (-13.0 + k * 3.0)
+		p.line(c - n * 4.8 + d * 1.0, c + n * 4.8 - d * 1.0, Color(0.08, 0.03, 0.02), 0.6)
+	# skull pommel with ember eyes
+	var sk := grip - d * 46.0
+	p.ball(sk.x, sk.y, 6.0, 6.4, Color(0.66, 0.6, 0.48))
+	p.ball(sk.x - d.x * 4.2, sk.y - d.y * 4.2, 3.8, 2.4, Color(0.6, 0.55, 0.44))
+	for sv in [-1.0, 1.0]:
+		var es: Vector2 = sk + n * (float(sv) * 2.3) + d * 1.0
+		p.ellipse(es.x, es.y, 1.5, 1.7, Color(0.05, 0.03, 0.02))
+		p.glow(es.x, es.y, 3.0, EMBER, 0.8)
+	# cleaver blade, jagged edge (reach matches the base axe)
+	var s := 1.25
+	var loc := func(u: float, v: float) -> Vector2: return head + (d * u + n * v) * s
+	var pts := PackedVector2Array([loc.call(12, 3), loc.call(13, 10), loc.call(15, 27)])
+	for k in 9:
+		pts.append(loc.call(15.0 - k * 4.6, 29.5 + (2.2 if k % 2 == 0 else 0.0)))
+	pts.append(loc.call(-22, 26))
+	pts.append(loc.call(-23, 10))
+	pts.append(loc.call(-17, 3))
+	p.spec = 0.6
+	p.shininess = 22.0
+	p.grad_poly(pts, BLACK_IRON, head, n, 30.0 * s, 0.35, 0.85, 6.0)
+	var edge := PackedVector2Array([loc.call(15, 25), loc.call(15, 27)])
+	for k in 9:
+		edge.append(loc.call(15.0 - k * 4.6, 29.5 + (2.2 if k % 2 == 0 else 0.0)))
+	edge.append(loc.call(-22, 26))
+	edge.append(loc.call(-22, 23.5))
+	edge.append(loc.call(15, 23.5))
+	p.grad_poly(edge, Color(0.46, 0.46, 0.5), loc.call(0, 25), n, 4.5 * s, 0.9, 1.2, 3.0)
+	p.spec = 0.0
+	p.shininess = 18.0
+	var hole: Vector2 = loc.call(-15, 9)
+	p.ellipse(hole.x, hole.y, 3.0 * s, 3.0 * s, Color(0.03, 0.03, 0.035))
+	# hooked back spike (short)
+	p.grad_poly(PackedVector2Array([loc.call(6, -3), loc.call(2, -9), loc.call(-5, -15), loc.call(-3, -8), loc.call(-7, -3)]), BLACK_IRON, head, -n, 14.0 * s, 0.4, 0.9, 4.0)
+	# ember runes
+	var runes := [[5, 10, 5, 22], [5, 12, 8.5, 15], [5, 16, 8.5, 19], [-4, 10, -4, 22], [-4, 16, -7.5, 12.5], [-4, 16, -0.5, 12.5], [-13, 12, -13, 22], [-13, 14, -16.5, 17.5], [-16.5, 17.5, -13, 21]]
+	for rn in runes:
+		var r2: Array = rn
+		p.line(loc.call(r2[0], r2[1]), loc.call(r2[2], r2[3]), EMBER, 1.6)
+	for rn in runes:
+		var r3: Array = rn
+		p.line(loc.call(r3[0], r3[1]), loc.call(r3[2], r3[3]), EMBER_HOT, 0.6)
+		var m: Vector2 = (loc.call(r3[0], r3[1]) as Vector2).lerp(loc.call(r3[2], r3[3]), 0.5)
+		p.glow(m.x, m.y, 3.6, EMBER, 0.35)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 900 + frame
+	for k in 6:
+		var e: Vector2 = loc.call(rng.randf_range(-20, 13), rng.randf_range(32, 38))
+		p.glow(e.x, e.y, 1.5, EMBER_HOT, 0.9)
+
+
+static func _staff_moon_shaft(p: Painter, grip: Vector2, top: Vector2, d: Vector2, n: Vector2) -> void:
+	## "Moonsilver Staff": straight silver staff wound with filigree, crescent cradle.
+	p.spec = 0.9
+	p.shininess = 26.0
+	p.capsule(grip - d * 46.0, top - d * 10.0, 3.6, 3.0, SILVER)
+	var prev := grip - d * 40.0
+	for k in 48:
+		var t := float(k) / 47.0
+		var pt := (grip - d * 40.0).lerp(top - d * 13.0, t) + n * sin(t * 44.0) * 3.0
+		p.line(prev, pt, Color(0.86, 0.76, 0.48), 0.9)
+		prev = pt
+	for r in [0.15, 0.55, 0.9]:
+		var rp := (grip - d * 40.0).lerp(top - d * 13.0, float(r))
+		p.capsule(rp - n * 4.6, rp + n * 4.6, 1.3, 1.3, SILVER.lightened(0.15))
+	for sv in [-1.0, 1.0]:
+		var sd: float = sv
+		p.strand(PackedVector2Array([top - d * 10.0 + n * sd * 2.0, top - d * 4.0 + n * sd * 9.5, top + d * 5.0 + n * sd * 8.5, top + d * 11.0 + n * sd * 3.0]), 2.0, 0.6, SILVER)
+	p.capsule(top - d * 13.0 - n * 5.0, top - d * 13.0 + n * 5.0, 1.8, 1.8, Color(0.86, 0.76, 0.48))
+	p.spec = 0.0
+	p.shininess = 18.0
+
+
+static func _staff_eye_shaft(p: Painter, grip: Vector2, top: Vector2, d: Vector2, n: Vector2) -> void:
+	## "Staff of the Burning Eye": black twisted staff, horned skull cradling the eye-orb.
+	var black := Color(0.11, 0.1, 0.11)
+	p.spec = 0.6
+	p.capsule(grip - d * 46.0, top - d * 12.0, 3.4, 2.6, black)
+	for strand_i in 2:
+		var prev := grip - d * 46.0
+		for k in 60:
+			var t := float(k) / 59.0
+			var pt := (grip - d * 46.0).lerp(top - d * 12.0, t) + n * sin(t * 26.0 + strand_i * PI) * (2.6 - t * 0.6)
+			p.line(prev, pt, black.lightened(0.18 if strand_i == 0 else 0.08), 1.6)
+			prev = pt
+	p.spec = 0.0
+	var sk := top - d * 6.0
+	var bone := Color(0.66, 0.6, 0.48)
+	for sv in [-1.0, 1.0]:
+		var sd: float = sv
+		p.strand(PackedVector2Array([sk + n * sd * 5.0 - d * 1.0, sk + n * sd * 12.0 + d * 2.0, sk + n * sd * 13.0 + d * 10.0, sk + n * sd * 8.0 + d * 14.0]), 2.6, 0.7, Color(0.3, 0.25, 0.2))
+	p.ball(sk.x, sk.y, 6.2, 6.6, bone)
+	p.ball(sk.x - d.x * 4.4, sk.y - d.y * 4.4, 3.8, 2.4, bone.darkened(0.06))
+	for sv2 in [-1.0, 1.0]:
+		var ep: Vector2 = sk + n * (float(sv2) * 2.4) + d * 0.6
+		p.ellipse(ep.x, ep.y, 1.5, 1.7, Color(0.05, 0.03, 0.02))
+
+
+static func _staff_eye_orb(p: Painter, top: Vector2, d: Vector2, pal: Array, power: float, frame: int) -> void:
+	var c := top + d * 6.0
+	var cp := p.tp(c)
+	p.glow(c.x, c.y, 20.0 * power, pal[1], 0.5 * power)
+	Items.orb(p, cp.x, cp.y, (5.0 + power * 2.0) * p.k, float(frame) * 1.3, pal)
+	p.ellipse(c.x, c.y, 2.8, 2.8, Color(1.0, 0.88, 0.4) if pal[0] == Items.FIRE[0] else Color(0.8, 0.95, 1.0))
+	p.ellipse(c.x, c.y, 0.8, 2.4, Color(0.05, 0.02, 0.02))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 950 + frame
+	for k in 8:
+		var e := c + Vector2(rng.randf_range(-16, 16), rng.randf_range(-22, 4))
+		p.glow(e.x, e.y, 1.6, pal[2], 0.9)
+
+
+# =============================================================================== off-hand torch
+
+static func torch_offhand_frames() -> Image:
+	## Warrior's off-hand torch: left armoured gauntlet rising from the bottom-left edge.
+	## Drawn as a mirrored right hand (light mirrored too), then flipped horizontally, so the
+	## gauntlet matches the axe hand exactly. Frames 0-3: flame flicker loop.
+	var frames: Array = []
+	for f in 4:
+		var p := _new(470 + f)
+		p.light = Vector3(0.42, -0.62, 0.66).normalized()
+		var grip := Vector2(96.8, 75.0)
+		var top := Vector2(101.2, 52.5)
+		var bot := Vector2(95.2, 92.0)
+		var d := (top - grip).normalized()
+		# wooden handle, then the gauntlet closing around it
+		p.capsule(bot, top, 2.3, 2.1, Color(0.3, 0.2, 0.12))
+		for k in 3:
+			p.line(bot.lerp(top, 0.1 + k * 0.08) + Vector2(-1, 0), bot.lerp(top, 0.95) + Vector2(-1 + k, 0), Color(0.18, 0.11, 0.06), 0.4)
+		_gauntlet(p, grip, d, Vector2(30, 32))
+		# oil-soaked rag wrapping with drips
+		var rag_a := top + d * -4.0
+		var rag_b := top + d * 5.0
+		p.capsule(rag_a, rag_b, 3.8, 3.6, Color(0.13, 0.1, 0.08), 0.25)
+		for k in 4:
+			var wp := rag_a.lerp(rag_b, 0.15 + k * 0.23)
+			p.line(wp + Vector2(-3.6, 0.8), wp + Vector2(3.6, -0.8), Color(0.22, 0.17, 0.11), 0.6)
+		p.ball(rag_a.x + 1.5, rag_a.y + 2.2, 0.9, 1.6, Color(0.1, 0.08, 0.06))
+		_finish(p)
+		# flame, halo and embers (soft edges are fine: drawn as a UI overlay)
+		var base := rag_b + d * 0.6
+		var fl_h: float = 18.5 + [0.0, 1.6, -0.8, 1.0][f]
+		var fl_w: float = 4.4 + [0.0, 0.3, -0.2, 0.4][f]
+		p.glow(base.x, base.y - 6.0, 22.0, Color(1.0, 0.45, 0.12), 0.32)
+		PR.flame(p, base.x - 0.6, base.y, fl_h, fl_w, f * 1.7)
+		PR.flame(p, base.x + 1.6, base.y, fl_h * 0.62, fl_w * 0.55, f * 2.3 + 1.0)
+		p.glow(base.x, base.y - 4.0, 9.0, Color(1.0, 0.8, 0.4), 0.45)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 470 + f
+		for k in 5:
+			var e := base + Vector2(rng.randf_range(-5, 5), -fl_h - rng.randf_range(0, 9))
+			p.glow(e.x, e.y, 1.2, Color(1.0, 0.75, 0.3), 0.9)
+		# warm light spilling on the gauntlet
+		p.light_only(base.x, base.y + 8.0, 26.0, Color(1.0, 0.55, 0.2), 0.35)
+		p.img.flip_x()
 		frames.append(p.img)
 	return Painter.strip(frames)
