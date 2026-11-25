@@ -74,11 +74,11 @@ func open(options: Array, current: Dictionary, title: String, sub: String) -> vo
 func _card(w: Dictionary, i: int) -> Control:
 	var col: Color = Boons.RARITY_COLOR[str(w.rarity)]
 	var p := PanelContainer.new()
-	p.position = Vector2(32 + i * 412, 110)
-	p.custom_minimum_size = Vector2(392, 524)
-	p.size = Vector2(392, 524)
+	p.position = Vector2(32 + i * 412, 130)
+	p.custom_minimum_size = Vector2(392, 470)
+	p.size = Vector2(392, 470)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 4)
+	v.add_theme_constant_override("separation", 8)
 	p.add_child(v)
 	var pic := TextureRect.new()
 	var frames := 3 if str(w["class"]) == "hunter" else 4
@@ -87,7 +87,7 @@ func _card(w: Dictionary, i: int) -> Control:
 	at.atlas = tex
 	at.region = Rect2(0, 0, tex.get_width() / frames, tex.get_height())
 	pic.texture = at
-	pic.custom_minimum_size = Vector2(340, 150)
+	pic.custom_minimum_size = Vector2(340, 170)
 	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -96,16 +96,22 @@ func _card(w: Dictionary, i: int) -> Control:
 	var key := UiTheme.title("%d" % (i + 1), 18, UiTheme.GREY)
 	key.position = Vector2(4, 0)
 	pic.add_child(key)
-	var nm := UiTheme.title(str(w.name), 19, col)
+	var nm := UiTheme.title(str(w.name), 19, col, HORIZONTAL_ALIGNMENT_CENTER)
 	nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	nm.custom_minimum_size = Vector2(340, 0)
 	v.add_child(nm)
-	v.add_child(UiTheme.label("%s  -  %s" % [str(w.rarity).capitalize(), Forge.material_name(w)], 14, col.darkened(0.15)))
-	for line in Forge.describe(w):
-		var l := UiTheme.label(str(line), 14, UiTheme.CREAM)
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.custom_minimum_size = Vector2(340, 0)
-		v.add_child(l)
+	# just what matters: damage and speed, the enchantment, at most one more line
+	var sm := Forge.summary(w)
+	var stats := HBoxContainer.new()
+	stats.alignment = BoxContainer.ALIGNMENT_CENTER
+	stats.add_theme_constant_override("separation", 26)
+	v.add_child(stats)
+	stats.add_child(_stat("DAMAGE", float(sm.damage)))
+	stats.add_child(_stat("SPEED", float(sm.speed)))
+	if str(sm.enchant) != "":
+		v.add_child(UiTheme.title(str(sm.enchant), 18, Forge.glow(w), HORIZONTAL_ALIGNMENT_CENTER))
+	if not sm.extras.is_empty():
+		v.add_child(UiTheme.label("  -  ".join(sm.extras), 15, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
@@ -117,6 +123,15 @@ func _card(w: Dictionary, i: int) -> Control:
 	b.mouse_entered.connect(func(): Sfx.play("ui_hover", -8.0))
 	v.add_child(b)
 	return p
+
+
+func _stat(label: String, v: float) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	box.add_child(UiTheme.label(label, 13, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER))
+	var col := UiTheme.GREEN if v > 0.005 else (UiTheme.RED if v < -0.005 else UiTheme.CREAM)
+	box.add_child(UiTheme.title("%+d%%" % int(round(v * 100.0)), 26, col, HORIZONTAL_ALIGNMENT_CENTER))
+	return box
 
 
 func _unhandled_input(event: InputEvent) -> void:

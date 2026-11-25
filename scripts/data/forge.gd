@@ -206,6 +206,27 @@ static func describe(w: Dictionary) -> Array:
 	return lines
 
 
+const ENCHANT_SHORT := {"flame": "Burns foes", "frost": "Slows foes", "venom": "Poisons foes", "storm": "Chain lightning", "shadow": "Drains life", "holy": "Bane of bosses"}
+const EXTRA_SHORT := {"crit": "crit", "crit_mult": "crit damage", "lifesteal": "lifesteal", "cooldown": "cooldowns", "resource_regen": "resource",
+	"execute": "vs wounded", "armor": "armour", "speed": "move speed", "splash": "blast size", "holy": "vs bosses"}
+
+
+static func summary(w: Dictionary) -> Dictionary:
+	## The few numbers that matter, for a quick choice: damage, speed, enchantment, one extra line.
+	var m := mods(w)
+	var em: Dictionary = ENCHANTS.get(w.enchant, {}).get("mods", {})
+	for k in em:
+		m[k] = float(m.get(k, 0.0)) - float(em[k])
+	var extras := []
+	for k in ["crit", "crit_mult", "lifesteal", "execute", "cooldown", "armor", "speed", "resource_regen", "splash"]:
+		if absf(float(m.get(k, 0.0))) >= 0.005:
+			extras.append("%s%d%% %s" % ["+" if k != "cooldown" else "-", int(round(absf(float(m[k])) * 100.0)), EXTRA_SHORT[k]])
+	if float(m.get("pierce", 0.0)) > 0.0:
+		extras.append("+%d pierce" % int(m.pierce))
+	return {"damage": float(m.get("damage", 0.0)), "speed": float(m.get("attack_speed", 0.0)),
+		"enchant": str(ENCHANT_SHORT.get(w.enchant, "")), "extras": extras.slice(0, 2)}
+
+
 static func tint(w: Dictionary) -> Color:
 	return MATERIALS[clampi(int(w.material), 0, MATERIALS.size() - 1)].tint
 
