@@ -102,6 +102,9 @@ func _ready() -> void:
 	rng.randomize()
 	duo = Game.net.duo()
 	host = not duo or Game.net.is_host()
+	if not duo:
+		Game.run_seed = int(Game.pending_save.get("seed", rng.randi())) if not Game.pending_save.is_empty() else rng.randi()
+		Game.selected_map = Maps.resolve(Game.selected_map, rng.randi())
 	world = WorldView.create(self)
 	Sfx.world_root = world
 	_build_arena(Game.selected_map)
@@ -330,7 +333,7 @@ func _begin_prep(duration: float) -> void:
 		Game.net.send("prep", [wave, duration])
 	var next := wave + 1
 	if next % 5 == 0:
-		var be := Maps.boss_for_night(next)
+		var be := Maps.boss_for_night(next, Game.run_seed)
 		hud.show_banner("NIGHT %s" % UiTheme.roman(next), "Something calls you to %s..." % str(be.arena_name).capitalize(), be.color)
 	else:
 		hud.show_banner("NIGHT %s" % UiTheme.roman(next), "Prepare yourself" if not duo else "Prepare yourselves", UiTheme.GOLD)
@@ -651,7 +654,7 @@ func _start_boss_night() -> void:
 	if host and duo:
 		Game.net.send("boss_tp", [wave])
 	Sfx.play("boss_warning")
-	boss_entry = Maps.boss_for_night(wave)
+	boss_entry = Maps.boss_for_night(wave, Game.run_seed)
 	await hud.fade_to(boss_entry.color, 0.9)
 	_build_arena(boss_entry.arena)
 	_place_player()
@@ -1110,6 +1113,7 @@ func save_run() -> void:
 	Game.write_save({
 		"class": player.class_id,
 		"map": Game.selected_map,
+		"seed": Game.run_seed,
 		"wave": wave,
 		"score": score,
 		"kills": player.kills,

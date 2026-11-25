@@ -107,7 +107,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_leave_lobby()
 		return
 	if page_maps.visible and event is InputEventKey and event.pressed and not event.echo:
-		var keys := [KEY_1, KEY_2, KEY_3, KEY_4]
+		var keys := [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5]
 		var idx := keys.find(event.physical_keycode)
 		if idx >= 0 and idx < Maps.ORDER.size():
 			_select_map(Maps.ORDER[idx])
@@ -171,7 +171,7 @@ func _build_ui() -> void:
 	if not save.is_empty():
 		_menu_button(v, "CONTINUE", func(): Game.continue_run())
 		var cname: String = str(ClassData.CLASSES.get(str(save.get("class", "")), {}).get("name", "?"))
-		var mname: String = str(Maps.MAPS.get(str(save.get("map", "")), {}).get("name", "?"))
+		var mname: String = Maps.map_name(str(save.get("map", "")))
 		var pl: Dictionary = save.get("player", {})
 		var summary := UiTheme.label("%s  -  %s
 Dawn after night %s  -  %d gold" % [cname, mname, UiTheme.roman(int(save.get("wave", 1))), int(pl.get("gold", 0))], 15, Color(0.8, 0.75, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
@@ -496,7 +496,7 @@ func _build_map_page() -> void:
 	title.position = Vector2(0, 18)
 	title.size = Vector2(1280, 56)
 	page_maps.add_child(title)
-	var hint := UiTheme.label("Click a battlefield or press 1 - 4  -  ENTER to begin the vigil", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
+	var hint := UiTheme.label("Click a battlefield or press 1 - 5  -  ENTER to begin the vigil", 16, UiTheme.GREY, HORIZONTAL_ALIGNMENT_CENTER)
 	hint.position = Vector2(0, 72)
 	hint.size = Vector2(1280, 22)
 	page_maps.add_child(hint)
@@ -523,9 +523,9 @@ func _build_map_page() -> void:
 func _map_card(id: String, index: int) -> Button:
 	var m: Dictionary = Maps.MAPS[id]
 	var btn := Button.new()
-	btn.position = Vector2(42 + index * 302, 140)
-	btn.custom_minimum_size = Vector2(290, 430)
-	btn.size = Vector2(290, 430)
+	btn.position = Vector2(30 + index * 246, 140)
+	btn.custom_minimum_size = Vector2(236, 440)
+	btn.size = Vector2(236, 440)
 	btn.add_theme_stylebox_override("normal", _plate_style(0))
 	btn.add_theme_stylebox_override("hover", _plate_style(1))
 	btn.add_theme_stylebox_override("pressed", _plate_style(2))
@@ -533,35 +533,40 @@ func _map_card(id: String, index: int) -> Button:
 	var v := VBoxContainer.new()
 	v.set_anchors_preset(Control.PRESET_FULL_RECT)
 	# keep everything well inside the gold inner frame of the plate
-	v.offset_left = 42
-	v.offset_top = 40
-	v.offset_right = -42
-	v.offset_bottom = -34
+	v.offset_left = 36
+	v.offset_top = 38
+	v.offset_right = -36
+	v.offset_bottom = -30
 	v.add_theme_constant_override("separation", 8)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(v)
 	var thumb := TextureRect.new()
-	thumb.custom_minimum_size = Vector2(206, 116)
+	thumb.custom_minimum_size = Vector2(164, 92)
 	thumb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	thumb.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if ResourceLoader.exists(m.thumb):
+	if str(m.thumb) != "" and ResourceLoader.exists(m.thumb):
 		thumb.texture = load(m.thumb)
 	v.add_child(thumb)
-	var name_l := UiTheme.title(str(m.name).to_upper(), 21, UiTheme.GOLD)
+	if str(m.thumb) == "":
+		var q := UiTheme.title("?", 64, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+		q.custom_minimum_size = Vector2(164, 92)
+		q.position = Vector2(0, 0)
+		thumb.add_child(q)
+	var name_l := UiTheme.title(str(m.name).to_upper(), 19, UiTheme.GOLD)
 	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_l.custom_minimum_size = Vector2(206, 0)
+	name_l.custom_minimum_size = Vector2(164, 0)
 	v.add_child(name_l)
 	var diff := int(m.difficulty) - 1
 	v.add_child(UiTheme.label("Difficulty:  %s" % ["Easy", "Medium", "Hard"][diff], 16, [UiTheme.GREEN, Color(1.0, 0.8, 0.3), UiTheme.RED][diff]))
-	var desc := UiTheme.label(str(m.desc), 16, UiTheme.CREAM)
+	var desc := UiTheme.label(str(m.desc), 15, UiTheme.CREAM)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(206, 0)
+	desc.custom_minimum_size = Vector2(164, 0)
 	v.add_child(desc)
 	var key := UiTheme.title(str(index + 1), 18, UiTheme.GREY)
-	key.position = Vector2(232, 44)
+	key.position = Vector2(184, 42)
 	btn.add_child(key)
 	btn.mouse_entered.connect(func(): Sfx.play("ui_hover", -10.0))
 	btn.pressed.connect(func(): _select_map(id))
@@ -631,7 +636,7 @@ func _confirm_new_vigil() -> void:
 
 func _start_new() -> void:
 	Sfx.play("ui_confirm")
-	Game.selected_map = _selected_map
+	Game.selected_map = Maps.resolve(_selected_map, randi())
 	Game.selected_class = _selected
 	Game.goto(Game.SCENE_SURVIVAL)
 
@@ -780,7 +785,7 @@ func _build_lobby_page() -> void:
 	for id in Maps.ORDER:
 		var b := Button.new()
 		b.text = str(Maps.MAPS[id].name)
-		b.custom_minimum_size = Vector2(205, 46)
+		b.custom_minimum_size = Vector2(162, 46)
 		b.add_theme_font_size_override("font_size", 16)
 		b.toggle_mode = true
 		b.pressed.connect(func():
@@ -893,6 +898,7 @@ func _refresh_lobby() -> void:
 		b.disabled = not host
 		b.modulate = Color(1, 1, 1) if chosen else Color(0.55, 0.55, 0.55)
 		b.text = ("> %s <" if chosen else "%s") % str(Maps.MAPS[id].name)
+		b.add_theme_font_size_override("font_size", 14)
 	if host:
 		_lobby_go.text = "BEGIN THE VIGIL"
 		_lobby_go.disabled = not net.can_start()

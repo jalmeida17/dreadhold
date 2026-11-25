@@ -2,7 +2,8 @@ extends RefCounted
 ## Playable maps (chosen before a run) and the boss rotation (one boss every 5 nights,
 ## each fought in its own arena).
 
-const ORDER := ["keep", "crypt", "village", "cathedral"]
+const ORDER := ["keep", "crypt", "village", "cathedral", "forged"]
+const ArenaForge := preload("res://scripts/world/arena_forge.gd")
 
 const MAPS := {
 	"keep": {
@@ -33,6 +34,13 @@ const MAPS := {
 		"thumb": "res://assets/ui/maps/cathedral.png",
 		"ambience": "amb_cathedral",
 	},
+	"forged": {
+		"name": "Uncharted Lands",
+		"desc": "A battlefield forged anew for every vigil: ruins, ossuaries, foundries, glaciers, mires or temples, never the same twice.",
+		"difficulty": 2,
+		"thumb": "",
+		"ambience": "amb_keep",
+	},
 }
 
 ## Bosses in the order they are met (nights 5, 10, 15, 20, then the cycle repeats stronger).
@@ -50,9 +58,26 @@ static func night_music(night: int) -> String:
 
 
 static func ambience(map_id: String) -> String:
+	if map_id.begins_with("forged:"):
+		return str(ArenaForge.info(map_id).ambience)
 	return str(MAPS.get(map_id, {}).get("ambience", "amb_keep"))
 
 
-static func boss_for_night(night: int) -> Dictionary:
-	var idx := maxi(night / 5 - 1, 0) % BOSSES.size()
-	return BOSSES[idx]
+static func map_name(map_id: String) -> String:
+	if map_id.begins_with("forged:"):
+		return str(ArenaForge.info(map_id).name)
+	return str(MAPS.get(map_id, {}).get("name", "?"))
+
+
+static func resolve(map_id: String, rng_seed: int) -> String:
+	## "forged" (Uncharted Lands) becomes a concrete forged battlefield for this vigil.
+	return "forged:%d" % (absi(rng_seed) % 1000000000) if map_id == "forged" else map_id
+
+
+static func boss_for_night(night: int, run_seed: int = 0) -> Dictionary:
+	## The four legends first (nights 5 to 20), then a forged boss every five nights.
+	var idx := maxi(night / 5 - 1, 0)
+	if idx < BOSSES.size():
+		return BOSSES[idx]
+	var s := absi(hash([run_seed, night]))
+	return load("res://scripts/data/bestiary.gd").boss_entry(s, night)

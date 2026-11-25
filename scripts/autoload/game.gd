@@ -16,6 +16,8 @@ const SCENE_SURVIVAL := "res://scenes/survival.tscn"
 var selected_class := "warrior"
 var menu_page := "title"
 var selected_map := "keep"
+## Seed of the current vigil (forged bosses after night 20 derive from it; shared in duo).
+var run_seed := 0
 ## Run state to restore when the survival scene starts (set by continue_run()).
 var pending_save: Dictionary = {}
 var settings := {

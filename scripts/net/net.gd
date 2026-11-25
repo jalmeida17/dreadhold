@@ -118,7 +118,8 @@ func can_start() -> bool:
 
 func start_game() -> void:
 	if can_start():
-		_begin.rpc(map_id)
+		# Uncharted Lands: the host forges the battlefield, both build it from the same seed
+		_begin.rpc(load("res://scripts/data/maps.gd").resolve(map_id, randi()), randi())
 
 
 func leave() -> void:
@@ -218,9 +219,9 @@ func _lobby(map: String) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _begin(map: String) -> void:
-	map_id = map
+func _begin(map: String, run_seed: int = 0) -> void:
 	in_game = true
+	Game.run_seed = run_seed
 	_backlog.clear()
 	Game.selected_map = map
 	Game.selected_class = my_class

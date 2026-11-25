@@ -70,6 +70,8 @@ var boss_cell := Vector2i(14, 10)
 var goblin_cell := Vector2i(14, 19)
 var look_cell := Vector2i(14, 16)
 var layout := "keep"
+## Atmosphere of this map (an ENV entry, or a forged arena's own).
+var env_def: Dictionary = {}
 var wall_override := {}
 var pillar_tex := ""
 var ceiling_tex := "ceiling_wood"
@@ -85,11 +87,18 @@ var _mats := {}
 
 
 func is_boss_arena() -> bool:
-	return layout.begins_with("boss")
+	return layout.begins_with("boss") or layout.begins_with("forged_boss")
 
 
 func build(p_layout: String = "keep") -> void:
+	if p_layout.begins_with("forged"):
+		# the arena forge (scripts/world/arena_forge.gd)
+		layout = p_layout
+		env_def = load("res://scripts/world/arena_forge.gd").generate(self, p_layout)
+		_finish_build()
+		return
 	layout = p_layout if ENV.has(p_layout) else "keep"
+	env_def = ENV[layout]
 	match layout:
 		"crypt":
 			_layout_crypt()
@@ -107,12 +116,16 @@ func build(p_layout: String = "keep") -> void:
 			_layout_boss_ring("I", "s", "Y", "", ["I"])
 		_:
 			_layout_keep()
+	_finish_build()
+
+
+func _finish_build() -> void:
 	_build_geometry()
 	_build_props()
 	_build_environment()
-	if ENV[layout].has("circle"):
-		_build_ritual_circle(ENV[layout].circle)
-	if ENV[layout].get("snow", false):
+	if env_def.has("circle"):
+		_build_ritual_circle(env_def.circle)
+	if env_def.get("snow", false):
 		_build_snow()
 	debris = Node3D.new()
 	debris.name = "Debris"
@@ -627,8 +640,8 @@ func _mat(tex_name: String) -> StandardMaterial3D:
 	m.roughness = 0.95
 	m.metallic_specular = 0.15
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	if ENV[layout].has("tint"):
-		m.albedo_color = ENV[layout].tint
+	if env_def.has("tint"):
+		m.albedo_color = env_def.tint
 	var emit := "res://assets/textures/%s_emit.png" % tex_name
 	if ResourceLoader.exists(emit):
 		m.emission_enabled = true
@@ -828,7 +841,7 @@ func _build_props() -> void:
 
 
 func _build_environment() -> void:
-	var env: Dictionary = ENV[layout]
+	var env: Dictionary = env_def
 	var e := Environment.new()
 	var sky_name: String = env.sky
 	var sky_path := "res://assets/textures/%s.png" % sky_name

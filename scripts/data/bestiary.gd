@@ -70,6 +70,8 @@ static func new_id(night: int, rng: RandomNumberGenerator) -> String:
 
 
 static func generate(id: String) -> Dictionary:
+	if id.begins_with("gboss:"):
+		return generate_boss(id)
 	if _defs.has(id):
 		return _defs[id]
 	var parts := id.split(":")
@@ -222,3 +224,105 @@ static func describe_night(ids: Array) -> String:
 	for id in ids:
 		names.append(str(generate(id).name) + "s")
 	return ", ".join(names)
+
+
+# ============================================================================= forged bosses
+
+const BOSS_SYLLABLES_A := ["Vhar", "Mor", "Kael", "Thra", "Ul", "Gor", "Xal", "Zeth", "Ny", "Draug", "Sar", "Vel", "Ash", "Grim"]
+const BOSS_SYLLABLES_B := ["oth", "ak", "gul", "mire", "rath", "zul", "eth", "mor", "ith", "ax", "orn", "uun"]
+const BOSS_TITLES := {
+	"frost": ["the Frost Warden", "the Rime Lord", "the Winter Crown"],
+	"flame": ["the Ashen King", "the Pyre Tyrant", "the Ember Lord"],
+	"plague": ["the Plague Matron", "the Rot Lord", "the Blight Mother"],
+	"void": ["the Void Herald", "the Hollow Prophet", "the Starless One"],
+	"none": ["the Bone Tyrant", "the Grave Lord", "the Barrow King"],
+}
+const BOSS_LINES := {
+	"frost": "The cold bites to the bone", "flame": "The very air burns", "plague": "Rot seeps from the walls",
+	"void": "Reality frays at the edges", "none": "The dead kneel to their master",
+}
+const BOSS_MUSIC := {"frost": "music_boss_rime", "flame": "music_boss_cinder", "plague": "music_boss_rot", "void": "music_boss_hollow", "none": "music_boss_hollow"}
+const BOSS_CASTS := {
+	"frost": ["frost_nova", "blink", "volley"], "flame": ["meteor", "nova", "volley"], "plague": ["rain", "summon", "volley"],
+	"void": ["blink", "volley", "summon"], "none": ["summon", "volley", "rain"],
+}
+const BOSS_SHEET := {"frost": "boss_rime", "flame": "boss_cinder", "plague": "boss_rot", "void": "boss", "none": "boss"}
+const BOSS_ALERT := {"frost": "rime_cast", "flame": "cinder_roar", "plague": "rot_roar", "void": "boss_roar", "none": "boss_roar"}
+const BOSS_DEATH := {"frost": "rime_death", "flame": "cinder_death", "plague": "rot_death", "void": "boss_death", "none": "boss_death"}
+const BOSS_COLOR := {"frost": Color(0.55, 0.9, 1.0), "flame": Color(1.0, 0.55, 0.2), "plague": Color(0.8, 1.0, 0.35), "void": Color(0.75, 0.45, 1.0), "none": Color(0.5, 1.0, 0.55)}
+
+
+static func boss_element(seed_v: int) -> String:
+	var keys: Array = BOSS_TITLES.keys()
+	return keys[absi(seed_v) % keys.size()]
+
+
+static func boss_entry(seed_v: int, night: int) -> Dictionary:
+	## The boss-night entry (same shape as Maps.BOSSES) of a forged boss.
+	var el := boss_element(seed_v)
+	var id := "gboss:%d:%d" % [absi(seed_v), night]
+	var d := generate_boss(id)
+	return {"enemy": id, "arena": "forged_boss:%d:%s" % [absi(seed_v), el],
+		"arena_name": "THE LAIR OF %s" % str(d.name).to_upper(), "arena_line": BOSS_LINES[el],
+		"color": BOSS_COLOR[el], "music": BOSS_MUSIC[el]}
+
+
+static func generate_boss(id: String) -> Dictionary:
+	if _defs.has(id):
+		return _defs[id]
+	var parts := id.split(":")
+	var seed_v := int(parts[1]) if parts.size() > 1 else 1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v * 7919 + 17
+	var el := boss_element(seed_v)
+	var bodies := ["knight", "skeleton", "wraith", "cultist", "ghoul"]
+	var body: String = bodies[rng.randi_range(0, bodies.size() - 1)]
+	var kit: Array = KIT[body]
+	var weapon: String = kit[rng.randi_range(0, kit.size() - 1)]
+	var w: Dictionary = WEAPONS[weapon]
+	var heads := ["crowned_skull", "horned_skull", "helm", "wolf_skull"]
+	var offhands := ["skull_orb", "lantern", "shield"]
+	var look := {"body": body, "armor": ARMORS[rng.randi_range(2, ARMORS.size() - 1)], "head": heads[rng.randi_range(0, heads.size() - 1)],
+		"offhand": "" if w.get("two_handed", false) else offhands[rng.randi_range(0, offhands.size() - 1)], "weapon": weapon, "aura": "" if el == "none" else el}
+	var titles: Array = BOSS_TITLES[el]
+	var bname: String = BOSS_SYLLABLES_A[rng.randi_range(0, BOSS_SYLLABLES_A.size() - 1)] + BOSS_SYLLABLES_B[rng.randi_range(0, BOSS_SYLLABLES_B.size() - 1)]
+	var btitle: String = titles[rng.randi_range(0, titles.size() - 1)]
+	var casts: Array = BOSS_CASTS[el].duplicate()
+	var extra := ["summon", "volley", "rain", "nova", "blink", "meteor", "frost_nova"]
+	for i in range(extra.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = extra[i]
+		extra[i] = extra[j]
+		extra[j] = tmp
+	for c in extra:
+		if casts.size() >= 4:
+			break
+		if not c in casts and rng.randf() < 0.5:
+			casts.append(c)
+	var sheet := "res://assets/sprites/enemies/%s.png" % BOSS_SHEET[el]
+	var tex: Texture2D = texture_for(look, sheet)
+	var frames := 9
+	var portrait: Variant = "res://assets/ui/portrait_%s.png" % BOSS_SHEET[el]
+	if tex.get_width() == FRAME * FRAMES:
+		# parts art: a giant made from the forged parts, twice the size
+		var img := tex.get_image()
+		img.resize(FRAME * FRAMES * 2, FRAME * 2, Image.INTERPOLATE_NEAREST)
+		tex = ImageTexture.create_from_image(img)
+		frames = FRAMES
+		var at := AtlasTexture.new()
+		at.atlas = tex
+		at.region = Rect2(48, 4, 96, 96)
+		portrait = at
+	var d := {
+		"name": bname, "title": btitle.capitalize(), "generated": true, "texture": tex, "sheet": sheet, "frames": frames, "height": 4.4,
+		"hp": 3000.0 + rng.randf_range(-200.0, 400.0), "speed": rng.randf_range(2.8, 3.6), "damage": rng.randf_range(32.0, 38.0), "range": 3.6,
+		"atk_cd": rng.randf_range(1.8, 2.2), "windup": 0.7, "radius": 0.8, "body_h": 3.8, "pain": 0.0, "cost": 0, "score": 1600, "gold": [210, 290],
+		"smash": 4.2, "knockback": 10.0, "boss": true, "element": el,
+		"gib": "dust" if body in ["skeleton", "knight", "wraith"] else "blood", "alert": BOSS_ALERT[el], "attack_sfx": "brute_smash", "death": BOSS_DEATH[el],
+		"hit": "hit_metal" if body == "knight" else ("hit_bone" if body in ["skeleton", "wraith"] else "hit_flesh"),
+		"cast_sfx": "frost_cast" if el == "frost" else "boss_cast", "volley_sfx": {"frost": "frost_cast", "flame": "fireball_cast"}.get(el, "shadow_bolt"),
+		"color": BOSS_COLOR[el], "casts": casts, "proj": {"frost": "ice", "flame": "ember", "plague": "acid", "void": "shadow"}.get(el, "soul"),
+		"summon": ["skeleton", "ghoul", "archer"] if body != "cultist" else ["cultist", "ghoul"], "portrait": portrait,
+	}
+	_defs[id] = d
+	return d

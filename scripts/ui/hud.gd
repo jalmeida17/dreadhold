@@ -693,7 +693,12 @@ func show_boss(e: Node) -> void:
 	boss_name_label.text = str(e.d.name).to_upper()
 	boss_name_label.add_theme_color_override("font_color", col)
 	boss_sub_label.text = str(e.d.get("title", ""))
-	_load_boss_portrait(str(e.d.get("portrait", "")))
+	var portrait = e.d.get("portrait", "")
+	if portrait is Texture2D:
+		boss_frames = [portrait]
+		boss_portrait.texture = portrait
+	else:
+		_load_boss_portrait(str(portrait))
 	_ghost_v = 100.0
 	boss_root.visible = true
 	boss_root.modulate = Color(1, 1, 1)
