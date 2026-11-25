@@ -13,7 +13,7 @@
 ![Status](https://img.shields.io/badge/status-early%20prototype-orange)
 ![Duo](https://img.shields.io/badge/online-2--player%20co--op-8a2be2)
 
-### [▶ Play in your browser](https://dreadhold.vercel.app)
+### [▶ Play in your browser](https://dreadhold.vercel.app) · [⬇ Download for Windows / Linux](https://github.com/jalmeida17/dreadhold/releases/latest)
 
 </div>
 
@@ -33,6 +33,9 @@ asset is the [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL 
 
 - **In the browser**: [dreadhold.vercel.app](https://dreadhold.vercel.app), on any recent desktop browser
   (Chrome, Edge, Firefox). Click into the game to capture the mouse; `Esc` releases it and pauses.
+- **Desktop app**: download the latest build for Windows or Linux from the
+  [Releases page](https://github.com/jalmeida17/dreadhold/releases/latest). The builds are not code-signed:
+  on Windows, click *More info* then *Run anyway* if SmartScreen complains.
 - **From source**: see *Getting started* below.
 
 ## Screenshots
@@ -166,6 +169,12 @@ npm test              # smoke test (host, join, forward, refusals, leaving) agai
 npx wrangler deploy   # publish (after a one-time "npx wrangler login")
 ```
 
+## Releases
+
+Pushing a version tag (`git tag v0.2.0 && git push origin v0.2.0`) runs the **Release** workflow
+(`.github/workflows/release.yml`): it exports the Windows and Linux builds and publishes them as a GitHub
+release, with the notes from `docs/release-notes/<tag>.md`.
+
 ## Web build
 
 Every push to `main` runs the **Web build** workflow (`.github/workflows/deploy-web.yml`): it installs
@@ -196,7 +205,7 @@ docs/screenshots/  images for this README
 ## Roadmap
 
 - [x] Online duo vigils (2-player co-op), in the app and in the browser
-- [ ] Desktop releases (Windows, Linux) on GitHub
+- [x] Desktop releases (Windows, Linux) on GitHub
 - [ ] More champions and more abilities per class
 - [ ] More enemy types and bosses, more arenas
 - [ ] Controller support
