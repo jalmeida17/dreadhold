@@ -16,11 +16,11 @@ const PauseMenu := preload("res://scripts/ui/pause_menu.gd")
 const GameOver := preload("res://scripts/ui/game_over.gd")
 const Fx := preload("res://scripts/combat/fx.gd")
 const UiTheme := preload("res://scripts/ui/ui_theme.gd")
+const Maps := preload("res://scripts/data/maps.gd")
 
 enum Phase { PREP, NIGHT, CLEARED, DAWN, TELEPORT, BOSS, OVER }
 
 const MAX_CORPSES := 45
-const GOBLIN_CELL := Vector2i(14, 19)
 
 var world: SubViewport
 var entities: Node3D
@@ -49,6 +49,8 @@ var stats := {
 	"bosses": 0, "kills_by_type": {}, "gold_spent": 0,
 }
 var _prep_len := 4.0
+var boss_entry: Dictionary = {}
+var _new_weapon := false
 var _flow_t := 0.0
 
 
@@ -56,7 +58,7 @@ func _ready() -> void:
 	rng.randomize()
 	world = WorldView.create(self)
 	Sfx.world_root = world
-	_build_arena("keep")
+	_build_arena(Game.selected_map)
 	player = Player.new()
 	entities.add_child(player)
 	player.setup(Game.selected_class, arena, self)
@@ -77,6 +79,11 @@ func _ready() -> void:
 	Sfx.music("music_battle")
 	if Game.test.has("god"):
 		player.invuln = 99999.0
+	if Game.test.has("torch"):
+		player.equip_torch()
+	if Game.test.has("tier"):
+		for i in int(Game.test["tier"]):
+			player.upgrade_weapon()
 	if Game.test.has("wave"):
 		wave = int(Game.test["wave"]) - 1
 	if Game.test.has("face"):
@@ -132,10 +139,7 @@ func _build_arena(layout: String) -> void:
 func _place_player() -> void:
 	player.velocity = Vector3.ZERO
 	player.global_position = arena.player_spawn() + Vector3(0, 0.1, 0)
-	if arena.layout == "boss":
-		player.look_at_point(arena.boss_spawn())
-	else:
-		player.look_at_point(arena.cell_center(Vector2i(14, 16)))
+	player.look_at_point(arena.cell_center(arena.look_cell))
 	player.pitch = 0.0
 
 
@@ -172,7 +176,7 @@ func _process(delta: float) -> void:
 				_night_cleared()
 		Phase.CLEARED:
 			if phase_t >= 2.5:
-				if arena.layout == "boss":
+				if arena.is_boss_arena():
 					_return_to_keep()
 				else:
 					_begin_dawn()
@@ -190,7 +194,8 @@ func _begin_prep(duration: float) -> void:
 	_prep_len = duration
 	var next := wave + 1
 	if next % 5 == 0:
-		hud.show_banner("NIGHT %s" % UiTheme.roman(next), "A cold voice calls you to the Barrow Throne...", Color(0.5, 1.0, 0.55))
+		var be := Maps.boss_for_night(next)
+		hud.show_banner("NIGHT %s" % UiTheme.roman(next), "Something calls you to %s..." % str(be.arena_name).capitalize(), be.color)
 	else:
 		hud.show_banner("NIGHT %s" % UiTheme.roman(next), "Prepare yourself", UiTheme.GOLD)
 
@@ -268,17 +273,18 @@ func spawn_enemy(type_id: String, pos: Vector3) -> Node:
 	e.global_position = pos + Vector3(0, 0.05, 0)
 	e.setup(type_id, arena, player, self, wave)
 	alive_count += 1
-	Fx.spawn(entities, "portal", pos + Vector3(0, 1.0, 0), 2.0 if type_id != "boss" else 4.5, 6.0)
+	var big: bool = EnemyData.TYPES[type_id].get("boss", false)
+	Fx.spawn(entities, "portal", pos + Vector3(0, 1.0, 0), 4.5 if big else 2.0, 6.0)
 	Fx.flash(entities, pos + Vector3(0, 1.2, 0), Color(0.35, 1.0, 0.45), 2.5, 6.0, 0.8)
 	Sfx.play_at("enemy_spawn", pos, -4.0, 0.1, 0.15)
 	hud.ping(pos)
 	return e
 
 
-func summon_minions(center: Vector3, count: int) -> void:
+func summon_minions(center: Vector3, count: int, types: Array = ["skeleton", "ghoul"]) -> void:
 	for i in count:
 		var p: Vector3 = arena.random_floor_near(center, 3, rng)
-		spawn_enemy("skeleton" if rng.randf() < 0.5 else "ghoul", p)
+		spawn_enemy(str(types[rng.randi_range(0, types.size() - 1)]), p)
 
 
 func on_enemy_killed(e: Node) -> void:
@@ -292,7 +298,8 @@ func on_enemy_killed(e: Node) -> void:
 		boss = null
 		stats.bosses += 1
 		hud.boss_defeated()
-		hud.show_banner("THE HOLLOW KING FALLS", "...but death is patient", Color(0.5, 1.0, 0.55))
+		hud.show_banner("%s FALLS" % str(e.d.name).to_upper(), "...but death is patient", e.d.get("color", UiTheme.GOLD))
+		_new_weapon = player.upgrade_weapon()
 		player.heal(player.max_hp)
 		Sfx.music("music_battle")
 		# his court crumbles with him
@@ -307,8 +314,9 @@ func boss_hp_changed(_e: Node) -> void:
 
 func boss_phase(_e: Node, p: int) -> void:
 	hud.boss_phase(p)
-	var lines := ["", "", "THE HOLLOW KING GROWS WRATHFUL", "THE HOLLOW KING UNLEASHES HIS FURY"]
-	hud.show_banner(lines[p], "A phylactery shatters!", Color(0.5, 1.0, 0.55))
+	var nm := str(_e.d.name).to_upper()
+	var lines := ["", "", "%s GROWS WRATHFUL" % nm, "%s UNLEASHES ITS FURY" % nm]
+	hud.show_banner(lines[p], "A phylactery shatters!", _e.d.get("color", UiTheme.GOLD))
 
 
 func add_corpse(holder: Node3D, pos: Vector3) -> void:
@@ -326,7 +334,7 @@ func _night_cleared() -> void:
 	phase_t = 0.0
 	score += wave * 50
 	Sfx.play("wave_clear")
-	if arena.layout != "boss":
+	if not arena.is_boss_arena():
 		hud.show_banner("DAWN BREAKS", "Night %s survived" % UiTheme.roman(wave), Color(1.0, 0.85, 0.45))
 	if Game.test.has("log"):
 		print("[night] cleared %d kills=%d hp=%d gold=%d t=%.1f" % [wave, player.kills, int(player.hp), player.gold, player.time_alive])
@@ -339,31 +347,43 @@ func _start_boss_night() -> void:
 	queue = []
 	wave_total = 1
 	Sfx.play("boss_warning")
-	await hud.fade_to(Color(0.25, 1.0, 0.45), 0.9)
-	_build_arena("boss")
+	boss_entry = Maps.boss_for_night(wave)
+	await hud.fade_to(boss_entry.color, 0.9)
+	_build_arena(boss_entry.arena)
 	_place_player()
 	Sfx.music("music_boss")
 	await get_tree().create_timer(0.25).timeout
 	hud.fade_from(1.0)
-	hud.show_banner("THE BARROW THRONE", "There is no escape", Color(0.5, 1.0, 0.55))
+	hud.show_banner(boss_entry.arena_name, boss_entry.arena_line, boss_entry.color)
 	await get_tree().create_timer(2.2).timeout
 	if phase == Phase.OVER:
 		return
 	phase = Phase.BOSS
 	phase_t = 0.0
-	boss = spawn_enemy("boss", arena.boss_spawn())
+	boss = spawn_enemy(boss_entry.enemy, arena.boss_spawn())
+	# later cycles bring the bosses back stronger
+	var cycle := (wave / 5 - 1) / Maps.BOSSES.size()
+	if cycle > 0:
+		boss.max_hp *= 1.0 + 0.6 * cycle
+		boss.hp = boss.max_hp
+		boss.damage *= 1.0 + 0.3 * cycle
 	hud.show_boss(boss)
 	Sfx.play_at("boss_roar", arena.boss_spawn(), 6.0)
-	hud.show_banner("THE HOLLOW KING", "Lord of the Barrow", Color(0.5, 1.0, 0.55))
+	hud.show_banner(str(boss.d.name).to_upper(), str(boss.d.title), boss.d.get("color", UiTheme.GOLD))
 
 
 func _return_to_keep() -> void:
 	phase = Phase.TELEPORT
 	await hud.fade_to(Color(1.0, 0.9, 0.6), 0.8)
-	_build_arena("keep")
+	_build_arena(Game.selected_map)
 	_place_player()
 	await get_tree().create_timer(0.2).timeout
 	hud.fade_from(0.9)
+	if _new_weapon:
+		_new_weapon = false
+		var w: Dictionary = player.weapon()
+		hud.show_banner("NEW WEAPON: %s" % str(w.name).to_upper(), str(w.desc), UiTheme.GOLD)
+		await get_tree().create_timer(3.4).timeout
 	_begin_dawn()
 
 
@@ -379,7 +399,7 @@ func _begin_dawn() -> void:
 	market.new_stock()
 	goblin = Goblin.new()
 	entities.add_child(goblin)
-	goblin.global_position = arena.cell_center(GOBLIN_CELL)
+	goblin.global_position = arena.cell_center(arena.goblin_cell)
 	hud.ping(goblin.global_position, Color(1.0, 0.8, 0.3))
 	hud.show_banner("A BLACK MARKET GOBLIN APPEARS", "Talk to Grizzle with [%s] to spend your gold" % Game.key_label(KEY_F), Color(1.0, 0.85, 0.45))
 	Sfx.play("boon_select")

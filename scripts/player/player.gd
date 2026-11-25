@@ -7,6 +7,7 @@ signal boon_applied(id: String)
 
 const ClassData := preload("res://scripts/data/classes.gd")
 const Boons := preload("res://scripts/data/boons.gd")
+const Weapons := preload("res://scripts/data/weapons.gd")
 const KITS := {
 	"warrior": preload("res://scripts/player/kits/warrior_kit.gd"),
 	"mage": preload("res://scripts/player/kits/mage_kit.gd"),
@@ -64,6 +65,10 @@ var last_hurt_time := -10.0
 var time_alive := 0.0
 var fov_kick := 0.0
 var hit_marker := 0.0
+var slow_t := 0.0
+var has_torch := false
+var _torch_light: OmniLight3D
+var weapon_tier := 0
 var _death_t := 0.0
 
 
@@ -136,7 +141,48 @@ func eye_position() -> Vector3:
 
 
 func move_speed() -> float:
-	return base_speed * mods.speed
+	return base_speed * mods.speed * (0.55 if slow_t > 0.0 else 1.0)
+
+
+func apply_slow(duration: float) -> void:
+	## Chilled by frost magic: move at about half speed for a while.
+	slow_t = maxf(slow_t, duration)
+
+
+func equip_torch() -> void:
+	## Off-hand torch (warrior): a warm light that follows the view; Cleave burns.
+	if has_torch:
+		return
+	has_torch = true
+	_torch_light = OmniLight3D.new()
+	_torch_light.light_color = Color(1.0, 0.62, 0.28)
+	_torch_light.light_energy = 1.8
+	_torch_light.omni_range = 11.0
+	_torch_light.omni_attenuation = 1.1
+	_torch_light.position = Vector3(-0.45, -0.25, -0.5)
+	camera.add_child(_torch_light)
+	Sfx.play("fireball_cast", -4.0)
+
+
+func weapon() -> Dictionary:
+	return Weapons.WEAPONS[class_id][weapon_tier]
+
+
+func upgrade_weapon() -> bool:
+	## Claim the next weapon tier (after a boss). Returns false at the last tier.
+	var tiers: Array = Weapons.WEAPONS[class_id]
+	if weapon_tier >= tiers.size() - 1:
+		return false
+	weapon_tier += 1
+	var w: Dictionary = tiers[weapon_tier]
+	var b: Dictionary = w.bonus
+	for k in b:
+		mods[k] = float(mods.get(k, 0.0)) + float(b[k])
+	if ResourceLoader.exists(w.sheet):
+		kit.weapon_tex = load(w.sheet)
+	power_flash = 1.0
+	Sfx.play("boon_select")
+	return true
 
 
 func _physics_process(delta: float) -> void:
@@ -195,6 +241,10 @@ func _process(delta: float) -> void:
 	power_flash = maxf(power_flash - delta * 2.5, 0.0)
 	hit_marker = maxf(hit_marker - delta * 5.0, 0.0)
 	invuln = maxf(invuln - delta, 0.0)
+	slow_t = maxf(slow_t - delta, 0.0)
+	if _torch_light != null:
+		var tt := Time.get_ticks_msec() * 0.001
+		_torch_light.light_energy = 1.8 * (0.85 + 0.15 * sin(tt * 11.0) * sin(tt * 6.7))
 	if not alive:
 		return
 	if mods.regen > 0.0:

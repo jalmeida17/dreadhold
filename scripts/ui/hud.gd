@@ -17,6 +17,7 @@ var player: Node
 var director: Node
 var root: Control
 var weapon: Sprite2D
+var torch_overlay: Sprite2D
 var crosshair: TextureRect
 var blood: TextureRect
 var dark: TextureRect
@@ -51,6 +52,9 @@ var boss_fill: ProgressBar
 var boss_ghost: ProgressBar
 var boss_gems: Array = []
 var _boss: Node = null
+var boss_name_label: Label
+var boss_sub_label: Label
+var weapon_label: Label
 var _ghost_v := 100.0
 var _banner_t := 0.0
 var _blink_t := 3.0
@@ -79,6 +83,11 @@ func setup(p_player: Node, p_director: Node) -> void:
 	weapon.hframes = player.kit.weapon_frames
 	weapon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	root.add_child(weapon)
+	torch_overlay = Sprite2D.new()
+	torch_overlay.centered = false
+	torch_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	torch_overlay.visible = false
+	root.add_child(torch_overlay)
 
 	dark = UiTheme.pix(load("res://assets/ui/hud/vignette_dark.png"), 4.0)
 	dark.modulate.a = 0.55
@@ -203,6 +212,10 @@ func _build_console(cls: String) -> void:
 	name_label = UiTheme.title(str(player.cdef.title).to_upper(), 19, UiTheme.GOLD)
 	name_label.position = Vector2(306, y0 + 62)
 	root.add_child(name_label)
+	weapon_label = UiTheme.label("", 15, Color(0.85, 0.75, 0.5), HORIZONTAL_ALIGNMENT_RIGHT)
+	weapon_label.position = Vector2(500, y0 + 64)
+	weapon_label.size = Vector2(196, 20)
+	root.add_child(weapon_label)
 	hp_bar = UiTheme.bar(Vector2(390, 22), "hp")
 	hp_bar.position = Vector2(306, y0 + 90)
 	root.add_child(hp_bar)
@@ -258,17 +271,6 @@ func _build_boss_plate() -> void:
 	boss_root.visible = false
 	boss_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(boss_root)
-	var bp_path := "res://assets/ui/portrait_boss.png"
-	if ResourceLoader.exists(bp_path):
-		var bt: Texture2D = load(bp_path)
-		var fs := bt.get_height()
-		var n := maxi(1, bt.get_width() / fs)
-		var crop := (fs - 34) / 2
-		for i in n:
-			var a := AtlasTexture.new()
-			a.atlas = bt
-			a.region = Rect2(i * fs + crop, crop - 4, 34, 34)
-			boss_frames.append(a)
 	boss_portrait = TextureRect.new()
 	boss_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	boss_portrait.stretch_mode = TextureRect.STRETCH_SCALE
@@ -293,12 +295,12 @@ func _build_boss_plate() -> void:
 		mark.position = Vector2(84 + 304.0 * (k + 1) / 3.0 - 1, 52)
 		mark.size = Vector2(2, 18)
 		boss_root.add_child(mark)
-	var bname := UiTheme.title("THE HOLLOW KING", 20, Color(0.65, 1.0, 0.6))
-	bname.position = Vector2(86, 6)
-	boss_root.add_child(bname)
-	var bsub := UiTheme.label("Lord of the Barrow", 14, Color(0.75, 0.8, 0.7))
-	bsub.position = Vector2(88, 30)
-	boss_root.add_child(bsub)
+	boss_name_label = UiTheme.title("", 20, Color(0.65, 1.0, 0.6))
+	boss_name_label.position = Vector2(86, 6)
+	boss_root.add_child(boss_name_label)
+	boss_sub_label = UiTheme.label("", 14, Color(0.75, 0.8, 0.7))
+	boss_sub_label.position = Vector2(88, 30)
+	boss_root.add_child(boss_sub_label)
 	var gems_tex: Texture2D = load("res://assets/ui/hud/gems.png")
 	for k in 3:
 		var g := TextureRect.new()
@@ -316,6 +318,10 @@ func _process(delta: float) -> void:
 	if player == null:
 		return
 	var kit: Node = player.kit
+	if weapon.texture != kit.weapon_tex:
+		weapon.texture = kit.weapon_tex
+		weapon.hframes = kit.weapon_frames
+	weapon_label.text = str(player.weapon().name)
 	# weapon (full-screen frames drawn at 2x; older half-size frames are centred)
 	var fw := float(weapon.texture.get_width()) / float(weapon.hframes)
 	var s := float(W) / fw if fw >= 600.0 else 2.0
@@ -327,6 +333,17 @@ func _process(delta: float) -> void:
 	else:
 		weapon.position = (Vector2(W * 0.5 - fw * s * 0.5, CONSOLE_Y + 50 - weapon.texture.get_height() * s) + bob + kit.kick * 2.0).round()
 	weapon.visible = player.alive
+	if player.has_torch and player.alive and ResourceLoader.exists("res://assets/weapons/torch_offhand.png"):
+		if torch_overlay.texture == null:
+			torch_overlay.texture = load("res://assets/weapons/torch_offhand.png")
+			torch_overlay.hframes = 4
+		var ts := float(W) / (float(torch_overlay.texture.get_width()) / 4.0)
+		torch_overlay.scale = Vector2(ts, ts)
+		torch_overlay.frame = int(Time.get_ticks_msec() / 90) % 4
+		torch_overlay.position = (Vector2(-bob.x * 0.7, -24.0 + bob.y * 0.8)).round()
+		torch_overlay.visible = true
+	else:
+		torch_overlay.visible = false
 	var lv: float = 0.88 + 0.12 * player.power_flash
 	weapon.modulate = Color(lv, lv * 0.97, lv * 0.94)
 	# vignettes & flashes
@@ -545,8 +562,29 @@ func show_prompt(text: String) -> void:
 	prompt_label.text = text
 
 
+func _load_boss_portrait(path: String) -> void:
+	boss_frames.clear()
+	if not ResourceLoader.exists(path):
+		path = "res://assets/ui/portrait_boss.png"
+	var bt: Texture2D = load(path)
+	var fs := bt.get_height()
+	var n := maxi(1, bt.get_width() / fs)
+	var crop := (fs - 34) / 2
+	for i in n:
+		var a := AtlasTexture.new()
+		a.atlas = bt
+		a.region = Rect2(i * fs + crop, crop - 4, 34, 34)
+		boss_frames.append(a)
+	boss_portrait.texture = boss_frames[0]
+
+
 func show_boss(e: Node) -> void:
 	_boss = e
+	var col: Color = e.d.get("color", Color(0.65, 1.0, 0.6))
+	boss_name_label.text = str(e.d.name).to_upper()
+	boss_name_label.add_theme_color_override("font_color", col)
+	boss_sub_label.text = str(e.d.get("title", ""))
+	_load_boss_portrait(str(e.d.get("portrait", "")))
 	_ghost_v = 100.0
 	boss_root.visible = true
 	boss_root.modulate = Color(1, 1, 1)

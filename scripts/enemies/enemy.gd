@@ -7,6 +7,7 @@ const Sprites := preload("res://scripts/util/sprites.gd")
 const Fx := preload("res://scripts/combat/fx.gd")
 const Projectile := preload("res://scripts/combat/projectile.gd")
 const Pickup := preload("res://scripts/combat/pickup.gd")
+const Hazard := preload("res://scripts/combat/hazard.gd")
 
 enum State { SPAWN, CHASE, WINDUP, STRIKE, PAIN, STUN, DEAD }
 
@@ -36,11 +37,12 @@ var _knock := Vector3.ZERO
 var _alerted := false
 var _strafe := 1.0
 var _cast_cd := 6.0
-var _cast_mode := 0
+var _cast_mode := ""
 var _dist := 99.0
 var _spawn_h := 0.0
 var is_boss := false
 var phase := 1
+var _base_tint := Color(1, 1, 1)
 var _atk_mult := 1.0
 
 
@@ -72,8 +74,15 @@ func setup(p_type: String, p_arena: Node3D, p_player: Node3D, p_director: Node, 
 	cs.shape = cap
 	cs.position.y = cap.height * 0.5
 	add_child(cs)
-	var tex: Texture2D = load(d.sheet)
+	var tex: Texture2D
+	var tint := Color(1, 1, 1)
+	if ResourceLoader.exists(d.sheet):
+		tex = load(d.sheet)
+	else:
+		tex = load("res://assets/sprites/enemies/boss.png")
+		tint = d.get("tint", Color(1, 1, 1))
 	sprite = Sprites.make(tex, int(d.frames), float(d.height), true, true)
+	_base_tint = tint
 	add_child(sprite)
 	_spawn_h = float(d.height)
 	sprite.position.y = -_spawn_h * 0.5
@@ -124,15 +133,15 @@ func _physics_process(delta: float) -> void:
 		State.CHASE:
 			move = _chase(to_player, delta)
 		State.WINDUP:
-			sprite.frame = EnemyData.FRAME_CAST if (is_boss and _cast_mode > 0 and sprite.hframes > 8) else EnemyData.FRAME_WINDUP
+			sprite.frame = EnemyData.FRAME_CAST if (is_boss and _cast_mode != "" and sprite.hframes > 8) else EnemyData.FRAME_WINDUP
 			if state_t >= float(d.windup):
 				_strike()
 				_set_state(State.STRIKE)
 		State.STRIKE:
-			if not (is_boss and _cast_mode > 0):
+			if not (is_boss and _cast_mode != ""):
 				sprite.frame = EnemyData.FRAME_STRIKE
 			if state_t >= 0.35:
-				_cast_mode = 0
+				_cast_mode = ""
 				_set_state(State.CHASE)
 		State.PAIN:
 			sprite.frame = EnemyData.FRAME_PAIN
@@ -158,7 +167,7 @@ func _physics_process(delta: float) -> void:
 	elif _flash_t > 0.0:
 		sprite.modulate = Color(1.6, 0.55, 0.5)
 	else:
-		sprite.modulate = Color(1, 1, 1)
+		sprite.modulate = _base_tint
 
 
 func _chase(to_player: Vector3, delta: float) -> Vector3:
@@ -177,7 +186,8 @@ func _chase(to_player: Vector3, delta: float) -> Vector3:
 			_begin_attack()
 			return Vector3.ZERO
 		if is_boss and _cast_cd <= 0.0 and _dist < 30.0:
-			_cast_mode = 1 if randf() < 0.45 else 2
+			var casts: Array = d.get("casts", ["summon", "volley"])
+			_cast_mode = str(casts[randi() % casts.size()])
 			_cast_cd = [7.0, 5.5, 4.0][phase - 1]
 			_begin_attack()
 			return Vector3.ZERO
@@ -220,7 +230,7 @@ func _walk_anim(delta: float, rate: float) -> void:
 
 func _begin_attack() -> void:
 	_set_state(State.WINDUP)
-	if is_boss and _cast_mode > 0:
+	if is_boss and _cast_mode != "":
 		Sfx.play_at("boss_cast", global_position, 2.0)
 	elif d.get("ranged", false) and type_id == "cultist":
 		Sfx.play_at("cultist_cast", global_position, -2.0, 0.1, 0.4)
@@ -230,18 +240,8 @@ func _strike() -> void:
 	atk_cd = float(d.atk_cd) * randf_range(0.85, 1.15) * _atk_mult
 	var chest: Vector3 = player.global_position + Vector3(0, 1.1, 0)
 	var origin := global_position + Vector3(0, float(d.body_h) * 0.75, 0)
-	if is_boss and _cast_mode == 1:
-		# summon the dead
-		director.summon_minions(global_position, 2 + phase)
-		return
-	if is_boss and _cast_mode == 2:
-		for i in 5:
-			var dir := (chest - origin).normalized().rotated(Vector3.UP, lerpf(-0.35, 0.35, float(i) / 4.0))
-			var p := Projectile.launch(get_parent(), "soul", origin, dir * 15.0, damage * 0.6, false)
-			p.owner_enemy = self
-			p.homing = 0.6
-			p.target = player
-		Sfx.play_at("shadow_bolt", origin, 2.0)
+	if is_boss and _cast_mode != "":
+		_boss_cast(_cast_mode, origin, chest)
 		return
 	if d.get("ranged", false):
 		var lead: Vector3 = player.velocity * (origin.distance_to(chest) / float(d.proj_speed)) * 0.5
@@ -371,3 +371,54 @@ func _process_dead(delta: float) -> void:
 		holder.add_child(corpse)
 		director.add_corpse(holder, global_position)
 		queue_free()
+
+
+# ============================================================================== boss casts
+
+func _boss_cast(mode: String, origin: Vector3, chest: Vector3) -> void:
+	var proj: String = d.get("proj", "soul")
+	var style: String = {"acid": "acid", "ember": "fire", "ice": "frost"}.get(proj, "fire")
+	match mode:
+		"summon":
+			director.summon_minions(global_position, 2 + phase, d.get("summon", ["skeleton", "ghoul"]))
+		"volley":
+			var n := 3 + phase * 2
+			for i in n:
+				var dir := (chest - origin).normalized().rotated(Vector3.UP, lerpf(-0.45, 0.45, float(i) / float(n - 1)))
+				var p := Projectile.launch(get_parent(), proj, origin, dir * 15.0, damage * 0.55, false)
+				p.owner_enemy = self
+				p.homing = 0.5
+				p.target = player
+			Sfx.play_at("shadow_bolt", origin, 2.0)
+		"rain", "meteor":
+			# telegraphed strikes on and around the player
+			var count := 3 + phase
+			for i in count:
+				var off := Vector3.ZERO if i == 0 else Vector3(randf_range(-4.5, 4.5), 0, randf_range(-4.5, 4.5))
+				var h: Node3D = Hazard.spawn(get_parent(), "strike", player.global_position + off, style, damage * 0.8, self)
+				h.delay = 1.0 + i * 0.18
+				h.radius = 2.3
+			Sfx.play_at("boss_cast", global_position, 2.0)
+		"nova":
+			var h: Node3D = Hazard.spawn(get_parent(), "nova", global_position, style, damage * 0.7, self)
+			h.max_radius = 18.0
+			h.speed = 11.0 + phase * 2.0
+			Fx.flash(get_parent(), global_position + Vector3(0, 1.5, 0), Color(1.0, 0.5, 0.2), 5.0, 10.0, 0.4)
+			Sfx.play_at("brute_smash", global_position, 4.0)
+			player.shake = maxf(player.shake, 0.8)
+		"blink":
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			var dest: Vector3 = arena.random_floor_near(player.global_position, 4, rng)
+			Fx.spawn(get_parent(), "portal", global_position + Vector3(0, 2.0, 0), 3.5, 12.0)
+			global_position = dest
+			Fx.spawn(get_parent(), "portal", global_position + Vector3(0, 2.0, 0), 3.5, 12.0)
+			Sfx.play_at("blink", global_position, 2.0)
+			_boss_cast("volley", global_position + Vector3(0, float(d.body_h) * 0.75, 0), chest)
+		"frost_nova":
+			Fx.ring(get_parent(), global_position, 9.0, Color(0.6, 0.9, 1.0, 1.0), 0.5)
+			Fx.flash(get_parent(), global_position + Vector3(0, 1.5, 0), Color(0.5, 0.85, 1.0), 5.0, 12.0, 0.5)
+			Sfx.play_at("frost_nova", global_position, 3.0)
+			if Vector2(player.global_position.x - global_position.x, player.global_position.z - global_position.z).length() < 9.0:
+				player.take_damage(damage * 0.45, global_position, "ranged", self)
+				player.apply_slow(3.0)

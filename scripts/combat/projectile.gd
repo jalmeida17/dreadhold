@@ -42,21 +42,22 @@ static func launch(parent: Node, p_kind: String, pos: Vector3, vel: Vector3, dmg
 
 func _build_visual() -> void:
 	match kind:
-		"fireball", "shadow", "soul":
-			var sheet: String = {"fireball": "fireball", "shadow": "shadow_bolt", "soul": "soul_bolt"}[kind]
+		"fireball", "shadow", "soul", "acid", "ember", "ice":
+			var sheet: String = {"fireball": "fireball", "shadow": "shadow_bolt", "soul": "soul_bolt", "acid": "soul_bolt", "ember": "fireball", "ice": "shadow_bolt"}[kind]
 			var tex: Texture2D = load("res://assets/sprites/fx/%s.png" % sheet)
 			_sprite = Sprite3D.new()
 			_sprite.texture = tex
 			_sprite.hframes = Sprites.frame_count(tex)
-			var size: float = {"fireball": 0.75, "shadow": 0.6, "soul": 0.8}[kind]
+			var size: float = {"fireball": 0.75, "shadow": 0.6, "soul": 0.8, "acid": 0.8, "ember": 0.9, "ice": 0.7}[kind]
 			_sprite.pixel_size = size / float(tex.get_height())
 			_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 			_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
 			_sprite.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 			_sprite.shaded = false
+			_sprite.modulate = {"acid": Color(1.2, 1.4, 0.4), "ice": Color(0.6, 1.2, 1.6)}.get(kind, Color(1, 1, 1))
 			add_child(_sprite)
 			var l := OmniLight3D.new()
-			l.light_color = {"fireball": Color(1.0, 0.55, 0.2), "shadow": Color(0.7, 0.3, 1.0), "soul": Color(0.4, 1.0, 0.5)}[kind]
+			l.light_color = {"fireball": Color(1.0, 0.55, 0.2), "shadow": Color(0.7, 0.3, 1.0), "soul": Color(0.4, 1.0, 0.5), "acid": Color(0.7, 1.0, 0.3), "ember": Color(1.0, 0.5, 0.15), "ice": Color(0.5, 0.85, 1.0)}[kind]
 			l.light_energy = 1.6
 			l.omni_range = 5.0
 			add_child(l)
@@ -143,7 +144,12 @@ func _physics_process(delta: float) -> void:
 func _impact(point: Vector3, normal: Vector3, col: Object) -> void:
 	var scene := get_parent()
 	match kind:
-		"fireball":
+		"ice":
+			Fx.spawn(scene, "frost", point, 1.4, 14.0)
+			Sfx.play_at("bolt_impact", point, -2.0)
+			if not from_player and col != null and col.has_method("apply_slow"):
+				col.apply_slow(1.2)
+		"fireball", "ember":
 			Fx.spawn(scene, "explosion", point + normal * 0.2, 1.4 + splash_radius * 0.5, 18.0)
 			Fx.flash(scene, point + normal * 0.4, Color(1.0, 0.55, 0.2), 4.0, 7.0, 0.3)
 			Sfx.play_at("fireball_explode", point, -2.0)
@@ -151,7 +157,7 @@ func _impact(point: Vector3, normal: Vector3, col: Object) -> void:
 			Fx.spawn(scene, "shadow_bolt", point, 1.0, 20.0)
 			Fx.flash(scene, point, Color(0.6, 0.2, 1.0), 2.5, 5.0, 0.25)
 			Sfx.play_at("bolt_impact", point, -3.0)
-		"soul":
+		"soul", "acid":
 			Fx.spawn(scene, "portal", point, 1.4, 16.0)
 			Fx.flash(scene, point, Color(0.3, 1.0, 0.4), 3.0, 6.0, 0.3)
 			Sfx.play_at("bolt_impact", point, -1.0)
