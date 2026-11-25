@@ -585,18 +585,23 @@ func _update_commands(kit: Node) -> void:
 
 
 func _update_inventory() -> void:
-	var sig := str(player.boons)
+	var sig := str(player.boons) + str(player.charms.size())
 	if sig == _boon_sig:
 		return
 	_boon_sig = sig
+	# newest first; all charms share one slot (with their count)
+	var items: Array = []
+	if not player.charms.is_empty():
+		var last: Dictionary = player.charms[player.charms.size() - 1]
+		items.append([str(last.icon), player.charms.size()])
 	var ids: Array = player.boons.keys()
+	for k in range(ids.size() - 1, -1, -1):
+		items.append([str(Boons.BOONS[ids[k]].icon), int(player.boons[ids[k]])])
 	for i in inv_slots.size():
 		var s: Control = inv_slots[i]
-		if i < ids.size():
-			var id: String = ids[ids.size() - 1 - i]
-			var b: Dictionary = Boons.BOONS[id]
-			s.icon = load("res://assets/ui/icons/%s.png" % b.icon)
-			var n := int(player.boons[id])
+		if i < items.size():
+			s.icon = load("res://assets/ui/icons/%s.png" % items[i][0])
+			var n := int(items[i][1])
 			s.corner = str(n) if n > 1 else ""
 		else:
 			s.icon = null

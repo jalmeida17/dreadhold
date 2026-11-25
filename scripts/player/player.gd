@@ -10,6 +10,7 @@ signal boon_applied(id: String)
 const ClassData := preload("res://scripts/data/classes.gd")
 const Boons := preload("res://scripts/data/boons.gd")
 const Weapons := preload("res://scripts/data/weapons.gd")
+const Charms := preload("res://scripts/data/charms.gd")
 const KITS := {
 	"warrior": preload("res://scripts/player/kits/warrior_kit.gd"),
 	"mage": preload("res://scripts/player/kits/mage_kit.gd"),
@@ -43,6 +44,8 @@ var mods := {
 	"splash": 0.0, "extra_fireball": 0.0, "nova_bonus": 0.0, "pierce": 0.0, "volley_extra": 0.0,
 }
 var boons := {}
+## Generated trinkets bought from Grizzle (scripts/data/charms.gd), in order of purchase.
+var charms: Array = []
 var potions := 1
 var max_potions := 3
 var gold := 0
@@ -532,6 +535,23 @@ func apply_boon(id: String) -> void:
 		undying += 1
 	power_flash = 1.0
 	boon_applied.emit(id)
+
+
+func apply_charm(c: Dictionary) -> void:
+	var m: Dictionary = c.get("mods", {})
+	for k in m:
+		var v := float(m[k])
+		if k == "max_hp":
+			max_hp += v
+			heal(v)
+		else:
+			mods[k] = float(mods.get(k, 0.0)) + v
+	mods.cooldown = maxf(mods.cooldown, 0.35)
+	for k in Charms.CAPS:
+		mods[k] = minf(float(mods.get(k, 0.0)), float(Charms.CAPS[k]))
+	charms.append(c)
+	power_flash = 1.0
+	boon_applied.emit("charm")
 
 
 func resource_ratio() -> float:

@@ -4,6 +4,10 @@ extends CanvasLayer
 
 const UiTheme := preload("res://scripts/ui/ui_theme.gd")
 const Boons := preload("res://scripts/data/boons.gd")
+const Charms := preload("res://scripts/data/charms.gd")
+## At most this many abilities per stock; generated charms fill the rest of the 6 slots.
+const MAX_BOONS := 4
+const SLOTS := 6
 
 const PRICES := {"common": 60, "rare": 110, "epic": 180, "legendary": 300}
 const POTION_PRICE := 40
@@ -235,7 +239,10 @@ func restore_stock(saved: Array, cost: int) -> void:
 	stock.clear()
 	for w in saved:
 		if typeof(w) == TYPE_DICTIONARY and w.has("kind"):
-			stock.append({"kind": str(w.kind), "id": str(w.get("id", "")), "price": int(w.get("price", 0)), "sold": bool(w.get("sold", false))})
+			var entry := {"kind": str(w.kind), "id": str(w.get("id", "")), "price": int(w.get("price", 0)), "sold": bool(w.get("sold", false))}
+			if w.has("charm"):
+				entry["charm"] = w.charm
+			stock.append(entry)
 	if stock.is_empty():
 		_roll()
 	restock_cost = cost
@@ -265,8 +272,14 @@ func _boon_price(id: String) -> int:
 
 func _roll() -> void:
 	stock.clear()
-	for id in Boons.roll(player.class_id, player.boons, 6, rng):
+	var ids: Array = Boons.roll(player.class_id, player.boons, MAX_BOONS, rng)
+	for id in ids:
 		stock.append({"kind": "boon", "id": id, "price": _boon_price(id), "sold": false})
+	# the charms never run out: they fill every slot the abilities leave
+	for i in SLOTS - ids.size():
+		var c: Dictionary = Charms.roll(int(director.wave), rng)
+		var price := _price(float(Charms.PRICES[c.rarity]) * (1.0 + 0.05 * player.charms.size()))
+		stock.append({"kind": "charm", "id": "charm", "price": price, "sold": false, "charm": c})
 	if player.class_id == "warrior" and not player.has_torch:
 		stock.append({"kind": "torch", "id": "torch", "price": _price(TORCH_PRICE), "sold": false})
 	stock.append({"kind": "potion", "id": "potion", "price": _price(POTION_PRICE), "sold": false})
@@ -317,6 +330,8 @@ func _ware_name(w: Dictionary) -> String:
 			return "Mend Wounds"
 		"torch":
 			return "Off-hand Torch"
+		"charm":
+			return str(w.charm.name)
 	return str(Boons.BOONS[w.id].name)
 
 
@@ -328,12 +343,16 @@ func _ware_icon(w: Dictionary) -> Texture2D:
 			return load("res://assets/ui/icons/health.png")
 		"torch":
 			return load("res://assets/ui/icons/torch.png")
+		"charm":
+			return load("res://assets/ui/icons/%s.png" % str(w.charm.icon))
 	return load("res://assets/ui/icons/%s.png" % Boons.BOONS[w.id].icon)
 
 
 func _ware_color(w: Dictionary) -> Color:
 	if w.kind == "boon":
 		return Boons.RARITY_COLOR[Boons.BOONS[w.id].rarity]
+	if w.kind == "charm":
+		return Boons.RARITY_COLOR[str(w.charm.rarity)]
 	return UiTheme.CREAM
 
 
@@ -345,6 +364,8 @@ func _ware_tag(w: Dictionary) -> String:
 			return "Service"
 		"torch":
 			return "Warrior gear"
+		"charm":
+			return "%s charm" % str(w.charm.rarity).capitalize()
 	var b: Dictionary = Boons.BOONS[w.id]
 	var t := str(b.rarity).capitalize()
 	if b.has("class"):
@@ -376,7 +397,7 @@ func _refresh() -> void:
 	for c in supply_box.get_children():
 		c.queue_free()
 	for i in stock.size():
-		if stock[i].kind == "boon":
+		if stock[i].kind in ["boon", "charm"]:
 			list_box.add_child(_row(i))
 		else:
 			supply_box.add_child(_tile(i))
@@ -486,6 +507,9 @@ func _show_details() -> void:
 		"torch":
 			d_owned.text = "Held in your off hand for the rest of the run"
 			d_desc.text = "A pitch-soaked torch for your left hand. Lights the darkness around you, and every Cleave sears foes for extra fire damage."
+		"charm":
+			d_owned.text = "Charms carried: %d" % player.charms.size()
+			d_desc.text = Charms.describe(w.charm)
 		_:
 			var b: Dictionary = Boons.BOONS[w.id]
 			d_owned.text = "Owned %d / %d" % [int(player.boons.get(w.id, 0)), int(b.max)]
@@ -512,6 +536,8 @@ func _buy(i: int) -> void:
 		"torch":
 			player.equip_torch()
 			Sfx.play("torch_ignite", -2.0)
+		"charm":
+			player.apply_charm(w.charm)
 		_:
 			player.apply_boon(w.id)
 	director.stat_add("gold_spent", float(w.price))
@@ -542,9 +568,8 @@ func _begin() -> void:
 
 
 func bot_shop() -> void:
-	## Test autopilot: buy the first affordable ability then start the night.
+	## Test autopilot: buy every affordable ability and charm, then start the night.
 	for i in stock.size():
-		if stock[i].kind == "boon" and _can_buy(stock[i]):
+		if stock[i].kind in ["boon", "charm"] and _can_buy(stock[i]):
 			_buy(i)
-			break
 	_begin()

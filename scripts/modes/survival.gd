@@ -1072,6 +1072,7 @@ func save_run() -> void:
 			"gold": player.gold,
 			"potions": player.potions,
 			"boons": player.boons,
+			"charms": player.charms,
 			"weapon_tier": player.weapon_tier,
 			"torch": player.has_torch,
 			"undying": player.undying,
@@ -1100,6 +1101,9 @@ func _restore(d: Dictionary) -> void:
 		if Boons.BOONS.has(id):
 			for i in int(boons[id]):
 				player.apply_boon(id)
+	for c in p.get("charms", []):
+		if typeof(c) == TYPE_DICTIONARY and c.has("mods"):
+			player.apply_charm(c)
 	for i in int(p.get("weapon_tier", 0)):
 		player.upgrade_weapon()
 	if bool(p.get("torch", false)):
