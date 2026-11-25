@@ -39,11 +39,25 @@ asset is the [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL 
 
 - **Doom-style FPS feel**: fast movement, billboard sprite enemies, chunky pixel rendering
   (the 3D world renders at 640×360, while the UI stays sharp at 1280×720).
-- **Three champions**, each with its own resource and kit (see below).
+- **Three champions**, each with its own resource and kit (see below), and **weapon upgrades**: every boss
+  slain grants the next weapon tier, shown in hand (Bearded Axe → Reaver Greataxe → Doomcleaver,
+  Ember Staff → Moonsilver Staff → Staff of the Burning Eye, Yew Longbow → Hornbow of the Wilds → Wyrmbone Greatbow).
+- **Four battlefields** to choose from:
+  - *Blackstone Keep*: a moonlit courtyard;
+  - *The Sunken Crypt*: a vaulted ossuary of corridors and tombs;
+  - *Hollowmere*: a misty ruined village;
+  - *The Defiled Cathedral*: a dark nave cut by a rood screen and walled chapels.
 - **Survival mode, "The Vigil"**:
   - **Nights**: each one is a wave of ghouls, skeletons, bone archers, shadow acolytes and barrow brutes.
-  - **At dawn**, *Grizzle the black-market goblin* appears. Trade with him to buy abilities and upgrades, potions or healing, or restock his wares.
-  - **Every 5th night**, you are teleported to the **Barrow Throne** to fight the Hollow King, a three-phase boss. Each shattered phylactery makes him angrier and summons more of his court.
+  - **At dawn**, *Grizzle the black-market goblin* appears. Trade with him to buy abilities and upgrades, potions or healing (and an off-hand torch for warriors), or restock his wares.
+  - **Every 5th night**, you are teleported into a boss arena. The four bosses take turns, and later cycles bring them back stronger. Each boss has three phases: every shattered phylactery makes it angrier.
+
+    | Boss | Arena | Signature attacks |
+    |---|---|---|
+    | The Hollow King | The Barrow Throne | raises the dead, soul volleys |
+    | Mother of Rot | The Rotting Pit | acid rain that leaves toxic pools, ghoul broods |
+    | The Cinder Tyrant | The Molten Forge | meteor strikes, a shockwave you must jump over |
+    | Lady Rime | The Frozen Sanctum | blinks around you, ice volleys, a frost nova that slows |
 - **RTS-inspired console HUD**: minimap with spawn pings, living portrait, and a command card with hotkeys and radial cooldowns. A night dial shows the night's progress, and a boss plate tracks the boss's phylacteries.
 - **Score screen** on defeat, with Overview, Combat and Upgrades tabs and comparisons to your personal bests.
 - **Procedural everything**: the generators live in `tools/` and can be re-run at any time.
@@ -66,6 +80,7 @@ asset is the [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL 
 | Utility ability | `E` or `Shift` |
 | Drink a potion | `R` |
 | Talk to the goblin | `F` |
+| Pick champion / battlefield | `1`–`4`, `Enter` |
 | Pause menu | `Esc` |
 
 ## Getting started
