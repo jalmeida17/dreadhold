@@ -193,7 +193,7 @@ func _page_combat() -> Control:
 	v.add_child(grid)
 	var kbt: Dictionary = director.stats.kills_by_type
 	for id in ["ghoul", "skeleton", "archer", "cultist", "brute", "boss"]:
-		var d: Dictionary = EnemyData.TYPES[id]
+		var d: Dictionary = EnemyData.get_type(id)
 		var cell := VBoxContainer.new()
 		cell.custom_minimum_size = Vector2(140, 0)
 		var tex: Texture2D = load(d.sheet)

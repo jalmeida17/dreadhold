@@ -45,6 +45,10 @@ var _spawn_h := 0.0
 var is_boss := false
 ## Elite: a tougher, larger, golden version of a common foe (from night 6).
 var elite := false
+## Monster-forge traits (swift, vampiric, volatile, splitting, regenerating, phasing...).
+var traits: Array = []
+var _phase_cd := 5.0
+var _banished := false
 var phase := 1
 var _base_tint := Color(1, 1, 1)
 var _atk_mult := 1.0
@@ -69,7 +73,8 @@ var _dot_tick := 0.5
 
 func setup(p_type: String, p_arena: Node3D, p_player: Node3D, p_director: Node, level: int) -> void:
 	type_id = p_type
-	d = EnemyData.TYPES[type_id]
+	d = EnemyData.get_type(type_id)
+	traits = d.get("traits", [])
 	arena = p_arena
 	player = p_player
 	director = p_director
@@ -101,7 +106,10 @@ func setup(p_type: String, p_arena: Node3D, p_player: Node3D, p_director: Node, 
 	add_child(cs)
 	var tex: Texture2D
 	var tint := Color(1, 1, 1)
-	if ResourceLoader.exists(d.sheet):
+	if d.has("texture"):
+		tex = d.texture
+		tint = d.get("tint", Color(1, 1, 1))
+	elif ResourceLoader.exists(d.sheet):
 		tex = load(d.sheet)
 	else:
 		tex = load("res://assets/sprites/enemies/boss.png")
@@ -116,11 +124,47 @@ func setup(p_type: String, p_arena: Node3D, p_player: Node3D, p_director: Node, 
 
 
 func banish() -> void:
-	## Host: dies at once, whatever it is doing (even rising from the ground).
+	## Host: dies at once, whatever it is doing (even rising from the ground), with no
+	## death throes (no explosion, no split).
 	if puppet or state == State.DEAD:
 		return
+	_banished = true
 	hp = 0.0
 	_die()
+
+
+func _on_hit_target(t: Node) -> void:
+	if str(d.get("element", "")) == "frost":
+		t.apply_slow(1.5)
+	if "vampiric" in traits:
+		hp = minf(max_hp, hp + damage * 0.35)
+
+
+func _process_traits(delta: float) -> void:
+	if "regenerating" in traits and hp < max_hp:
+		hp = minf(max_hp, hp + max_hp * 0.02 * delta)
+	if "phasing" in traits and state == State.CHASE:
+		_phase_cd -= delta
+		if _phase_cd <= 0.0 and _dist > 5.0 and is_instance_valid(player) and player.alive:
+			_phase_cd = randf_range(5.0, 8.0)
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			_fx("blink", arena.random_floor_near(player.global_position, 3, rng))
+
+
+func _death_throes() -> void:
+	## Host: what some forged foes leave behind when they fall.
+	var pos := global_position
+	if "volatile" in traits:
+		director.enemy_hazard(self, "nova", pos, "fire", damage * 0.8, {"max_radius": 4.5, "speed": 9.0})
+		Fx.spawn(get_parent(), "explosion", pos + Vector3(0, 1.0, 0), 2.4, 16.0)
+		Sfx.play_at("fireball_explode", pos, -2.0)
+	if str(d.get("element", "")) == "plague":
+		director.enemy_hazard(self, "pool", pos, "acid", damage * 0.4, {"radius": 2.0, "duration": 5.0})
+	if "splitting" in traits and not type_id.ends_with(":spawn"):
+		for k in 2:
+			var off := Vector3(randf_range(-0.8, 0.8), 0, randf_range(-0.8, 0.8))
+			director.spawn_enemy(type_id + ":spawn", pos + off)
 
 
 func make_elite() -> void:
@@ -171,6 +215,7 @@ func _physics_process(delta: float) -> void:
 	if puppet:
 		_puppet_step(delta)
 		return
+	_process_traits(delta)
 	_retarget_t -= delta
 	if _retarget_t <= 0.0 or not is_instance_valid(player):
 		_retarget_t = 0.4
@@ -325,9 +370,11 @@ func _strike() -> void:
 			var pd: float = Vector2(t.global_position.x - center.x, t.global_position.z - center.z).length()
 			if pd <= float(d.smash) and t.global_position.y < 1.2:
 				t.take_damage(damage, global_position, "smash", self)
+				_on_hit_target(t)
 		return
 	if _dist <= float(d.range) + 0.6 and los:
 		player.take_damage(damage, global_position, "melee", self)
+		_on_hit_target(player)
 		_fx("bite", player.global_position)
 	elif type_id == "ghoul":
 		_fx("miss")
@@ -414,6 +461,8 @@ func stun(duration: float, frozen: bool = false) -> void:
 func _die() -> void:
 	_die_local()
 	director.on_enemy_killed(self)
+	if not _banished and not puppet:
+		_death_throes()
 
 
 func net_die() -> void:
@@ -520,7 +569,7 @@ func _fx_local(kind: String, v: Vector3, n: int) -> void:
 		"windup":
 			if n == 1:
 				Sfx.play_at(str(d.get("cast_sfx", "boss_cast")), global_position, 2.0)
-			elif d.get("ranged", false) and type_id == "cultist":
+			elif d.get("ranged", false) and (type_id == "cultist" or d.get("caster", false)):
 				Sfx.play_at("cultist_cast", global_position, -2.0, 0.1, 0.4)
 		"shoot":
 			Sfx.play_at(d.attack_sfx, v, -2.0)

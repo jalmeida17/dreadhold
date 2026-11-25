@@ -90,4 +90,7 @@ const TYPES := {
 
 
 static func get_type(id: String) -> Dictionary:
-	return TYPES[id]
+	## Classic foes by name, generated ones ("gen:...") from the monster forge.
+	if TYPES.has(id):
+		return TYPES[id]
+	return load("res://scripts/data/bestiary.gd").generate(id)

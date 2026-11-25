@@ -26,6 +26,7 @@ const Hazard := preload("res://scripts/combat/hazard.gd")
 const UiTheme := preload("res://scripts/ui/ui_theme.gd")
 const Maps := preload("res://scripts/data/maps.gd")
 const Forge := preload("res://scripts/data/forge.gd")
+const Bestiary := preload("res://scripts/data/bestiary.gd")
 const ForgeChoice := preload("res://scripts/ui/forge_choice.gd")
 
 enum Phase { PREP, NIGHT, CLEARED, DAWN, TELEPORT, BOSS, OVER }
@@ -73,6 +74,8 @@ var boss_entry: Dictionary = {}
 ## Weapons offered by the last boss slain (chosen when back at the keep).
 var _forge_offer: Array = []
 var forge_ui: CanvasLayer
+## The forged species that walk tonight (monster forge ids).
+var night_species: Array = []
 var _flow_t := 0.0
 
 # ---- duo
@@ -394,7 +397,7 @@ func _start_night() -> void:
 	wave_total = queue.size()
 	spawn_t = 0.5
 	if duo:
-		Game.net.send("night", [wave])
+		Game.net.send("night", [wave, night_species])
 	_night_view()
 	if Game.test.has("log"):
 		print("[night] start %d with %d foes" % [wave, wave_total])
@@ -406,7 +409,12 @@ func _night_view() -> void:
 	wave_killed = 0
 	Sfx.play("wave_start")
 	Sfx.music(Maps.night_music(wave))
-	hud.show_banner("NIGHT %s" % UiTheme.roman(wave), _wave_flavour(), Color(0.95, 0.35, 0.25))
+	var sub := _wave_flavour()
+	if not night_species.is_empty():
+		sub = "Tonight: " + Bestiary.describe_night(night_species)
+	hud.show_banner("NIGHT %s" % UiTheme.roman(wave), sub, Color(0.95, 0.35, 0.25))
+	if Game.test.has("log") and not night_species.is_empty():
+		print("[bestiary] night %d: %s" % [wave, Bestiary.describe_night(night_species)])
 	if Game.test.has("log") and not host:
 		print("[ally] night %d begins" % wave)
 
@@ -420,6 +428,12 @@ func _compose_wave(n: int) -> Array:
 	var budget := 6 + n * 4 + int(0.15 * n * n)
 	if _duo_live():
 		budget = int(budget * DUO_WAVE)
+	# from night 3, forged species join the horde and soon make most of it
+	night_species = []
+	if n >= 3:
+		for i in mini(1 + n / 5, 4):
+			night_species.append(Bestiary.new_id(n, rng))
+	var forged_share := clampf(0.2 + 0.06 * float(n - 3), 0.0, 0.75)
 	var types := ["ghoul", "skeleton"]
 	if n >= 2:
 		types.append("archer")
@@ -432,7 +446,9 @@ func _compose_wave(n: int) -> Array:
 		var t: String = types[rng.randi_range(0, types.size() - 1)]
 		if t == "brute" and rng.randf() < maxf(0.55 - 0.03 * (n - 4), 0.1):
 			t = "skeleton"
-		var c: int = EnemyData.TYPES[t].cost
+		if not night_species.is_empty() and rng.randf() < forged_share:
+			t = night_species[rng.randi_range(0, night_species.size() - 1)]
+		var c: int = EnemyData.get_type(t).cost
 		if c > budget:
 			t = "ghoul"
 			c = 1
@@ -505,7 +521,7 @@ func spawn_enemy(type_id: String, pos: Vector3, hp_mult: float = 1.0, dmg_mult: 
 
 
 func _spawn_fx(type_id: String, pos: Vector3, elite: bool = false) -> void:
-	var big: bool = EnemyData.TYPES[type_id].get("boss", false)
+	var big: bool = EnemyData.get_type(type_id).get("boss", false)
 	Fx.spawn(entities, "portal", pos + Vector3(0, 1.0, 0), 4.5 if big else (2.6 if elite else 2.0), 6.0)
 	Fx.flash(entities, pos + Vector3(0, 1.2, 0), Color(1.0, 0.7, 0.25) if elite else Color(0.35, 1.0, 0.45), 2.5, 6.0, 0.8)
 	Sfx.play_at("enemy_spawn", pos, -4.0, 0.1, 0.15)
@@ -907,6 +923,7 @@ func net_event(_from: int, kind: String, a: Array) -> void:
 			_begin_prep(float(a[1]))
 		"night":
 			wave = int(a[0])
+			night_species = a[1] if a.size() > 1 else []
 			_night_view()
 		"cleared":
 			wave = int(a[0])
