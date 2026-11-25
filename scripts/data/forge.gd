@@ -218,7 +218,14 @@ static func summary(w: Dictionary) -> Dictionary:
 	for k in em:
 		m[k] = float(m.get(k, 0.0)) - float(em[k])
 	var extras := []
+	# the weapon's own properties first (they give it its name), then what its base type adds
+	var order: Array = w.get("affixes", {}).keys()
 	for k in ["crit", "crit_mult", "lifesteal", "execute", "cooldown", "armor", "speed", "resource_regen", "splash"]:
+		if not k in order:
+			order.append(k)
+	for k in order:
+		if not EXTRA_SHORT.has(k):
+			continue
 		if absf(float(m.get(k, 0.0))) >= 0.005:
 			extras.append("%s%d%% %s" % ["+" if k != "cooldown" else "-", int(round(absf(float(m[k])) * 100.0)), EXTRA_SHORT[k]])
 	if float(m.get("pierce", 0.0)) > 0.0:
