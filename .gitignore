@@ -16,3 +16,13 @@ tools/preview/
 Thumbs.db
 desktop.ini
 *.tmp
+
+# Python venv for tools/audio (audio generator)
+.venv/
+__pycache__/
+
+# Python venv for the audio generator
+.venv/
+
+# Vercel CLI link
+.vercel/

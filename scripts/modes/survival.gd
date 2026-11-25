@@ -43,6 +43,8 @@ var boss: Node = null
 var corpses: Array = []
 var goblin: Node3D = null
 var market: CanvasLayer
+## True while the mouse was captured last frame (browser pointer-lock watch).
+var _had_capture := false
 var rng := RandomNumberGenerator.new()
 var stats := {
 	"damage_dealt": 0.0, "damage_taken": 0.0, "potions_used": 0, "gold_earned": 0, "biggest_hit": 0.0,
@@ -164,9 +166,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
+func _watch_pointer_lock() -> void:
+	## In a browser, Esc releases the pointer lock before the game ever sees the key:
+	## pause instead of leaving the champion unable to look around.
+	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	if _had_capture and not captured and OS.has_feature("web") and phase != Phase.OVER and not get_tree().paused:
+		pause_menu.open()
+	_had_capture = captured
+
+
 # ======================================================================= main loop
 
 func _process(delta: float) -> void:
+	_watch_pointer_lock()
 	phase_t += delta
 	_flow_t -= delta
 	if _flow_t <= 0.0 and player.alive and phase != Phase.TELEPORT:
