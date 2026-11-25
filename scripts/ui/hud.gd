@@ -9,6 +9,8 @@ const CommandSlot := preload("res://scripts/ui/widgets/command_slot.gd")
 const Minimap := preload("res://scripts/ui/widgets/minimap.gd")
 const NightDial := preload("res://scripts/ui/widgets/night_dial.gd")
 const ClassData := preload("res://scripts/data/classes.gd")
+const Forge := preload("res://scripts/data/forge.gd")
+const ForgeChoice := preload("res://scripts/ui/forge_choice.gd")
 
 const W := 1280
 const H := 720
@@ -56,6 +58,7 @@ var _boss: Node = null
 var boss_name_label: Label
 var boss_sub_label: Label
 var weapon_label: Label
+var _weapon_sig := ""
 var _ghost_v := 100.0
 var _banner_t := 0.0
 var _blink_t := 3.0
@@ -413,10 +416,15 @@ func _process(delta: float) -> void:
 	if player == null:
 		return
 	var kit: Node = player.kit
-	if weapon.texture != kit.weapon_tex:
+	var w: Dictionary = player.weapon()
+	var wsig := str(w.get("name", "")) + str(kit.weapon_tex)
+	if weapon.texture != kit.weapon_tex or wsig != _weapon_sig:
+		_weapon_sig = wsig
 		weapon.texture = kit.weapon_tex
 		weapon.hframes = kit.weapon_frames
-	weapon_label.text = str(player.weapon().name)
+		weapon.material = ForgeChoice.weapon_material(w)
+		weapon_label.text = str(w.get("name", ""))
+		weapon_label.add_theme_color_override("font_color", Boons.RARITY_COLOR.get(str(w.get("rarity", "common")), UiTheme.CREAM))
 	# weapon (full-screen frames drawn at 2x; older half-size frames are centred)
 	var fw := float(weapon.texture.get_width()) / float(weapon.hframes)
 	var s := float(W) / fw if fw >= 600.0 else 2.0

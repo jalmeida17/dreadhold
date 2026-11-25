@@ -58,6 +58,13 @@ var _net_frame := 0
 var _net_flags := 0
 var _net_flash_prev := false
 var _local_hit_t := 0.0
+## Weapon enchantments (host side): burning, poison stacks, chill, and who inflicted them.
+var _burn_t := 0.0
+var _burn_dps := 0.0
+var _poison: Array = []
+var _chill_t := 0.0
+var _dot_by: Node = null
+var _dot_tick := 0.5
 
 
 func setup(p_type: String, p_arena: Node3D, p_player: Node3D, p_director: Node, level: int) -> void:
@@ -211,13 +218,26 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y = -0.5
 	move_and_slide()
-	# tint: hurt flash / frozen
-	if _frozen:
-		sprite.modulate = Color(0.55, 0.85, 1.3)
-	elif _flash_t > 0.0:
-		sprite.modulate = Color(1.6, 0.55, 0.5)
-	else:
-		sprite.modulate = _base_tint
+	_process_elements(delta)
+	if state == State.DEAD:
+		return
+	# tint: hurt flash / frozen / enchantments
+	sprite.modulate = _tint_for(_frozen, _flash_t > 0.0, _burn_t > 0.0, not _poison.is_empty(), _chill_t > 0.0)
+
+
+func _tint_for(frozen: bool, flash: bool, burning: bool, poisoned: bool, chilled: bool) -> Color:
+	if frozen:
+		return Color(0.55, 0.85, 1.3)
+	if flash:
+		return Color(1.6, 0.55, 0.5)
+	if burning:
+		var f := 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.03)
+		return Color(1.55 * f, 0.8 * f, 0.45)
+	if poisoned:
+		return Color(0.75, 1.3, 0.6)
+	if chilled:
+		return Color(0.7, 0.92, 1.35)
+	return _base_tint
 
 
 func _chase(to_player: Vector3, delta: float) -> Vector3:
@@ -269,7 +289,7 @@ func _chase(to_player: Vector3, delta: float) -> Vector3:
 			sep += off / dd * (minsep - dd)
 	dir = (dir + sep * 1.5).normalized() if (dir + sep).length() > 0.01 else Vector3.ZERO
 	_walk_anim(delta, 1.0)
-	var spd := speed * (0.4 if _frozen else 1.0)
+	var spd := speed * (0.4 if _frozen else 1.0) * (0.6 if _chill_t > 0.0 else 1.0)
 	return dir * spd
 
 
@@ -313,15 +333,21 @@ func _strike() -> void:
 		_fx("miss")
 
 
-func hurt(amount: float, from_pos: Vector3, knockback: float = 2.0, _by: Node = null) -> void:
+func hurt(amount: float, from_pos: Vector3, knockback: float = 2.0, _by: Node = null, proc: bool = true, fx: bool = true) -> void:
+	## proc: the hit may trigger the attacker's weapon enchantment; fx: gore and thud.
 	if state == State.DEAD or state == State.SPAWN:
 		return
+	var element := ""
+	var epower := 0.0
+	if proc and _by != null and _by.has_method("weapon_element"):
+		element = _by.weapon_element()
+		epower = amount * float(_by.weapon_element_power())
 	if puppet:
 		# the host decides; show the hit at once so it feels immediate
 		_flash_t = 0.12
 		_local_hit_t = 0.25
 		_hit_fx()
-		Game.net.send_to(1, "e_hurt", [net_id, amount, from_pos, knockback])
+		Game.net.send_to(1, "e_hurt", [net_id, amount, from_pos, knockback, element, epower])
 		return
 	if _by != null:
 		last_hitter = _by
@@ -334,7 +360,10 @@ func hurt(amount: float, from_pos: Vector3, knockback: float = 2.0, _by: Node = 
 	var kb_scale := 0.25 if is_boss else (0.45 if type_id == "brute" else 1.0)
 	if push.length() > 0.01:
 		_knock += push.normalized() * knockback * kb_scale
-	_hit_fx()
+	if fx:
+		_hit_fx()
+	if element != "" and hp > 0.0:
+		apply_element(element, epower, _by)
 	if is_boss:
 		var new_phase := 3 if hp_ratio() <= 0.3334 else (2 if hp_ratio() <= 0.6667 else 1)
 		if hp > 0.0 and new_phase > phase:
@@ -554,7 +583,68 @@ func net_state_flags() -> int:
 		f |= 1
 	if _flash_t > 0.0:
 		f |= 2
+	if _burn_t > 0.0:
+		f |= 4
+	if not _poison.is_empty():
+		f |= 8
+	if _chill_t > 0.0:
+		f |= 16
 	return f
+
+
+func apply_element(kind: String, amount: float, by: Node) -> void:
+	## Host: a weapon enchantment takes hold.
+	if puppet or state == State.DEAD or amount <= 0.0:
+		return
+	_dot_by = by
+	match kind:
+		"burn":
+			_burn_t = 3.0
+			_burn_dps = maxf(_burn_dps, amount / 3.0)
+		"poison":
+			if _poison.size() >= 5:
+				_poison.pop_front()
+			_poison.append([5.0, amount / 5.0])
+		"chill":
+			_chill_t = 2.0
+		"storm":
+			# lightning leaps to the two nearest foes
+			var others := []
+			for e in get_tree().get_nodes_in_group("enemies"):
+				if e != self and e.is_alive() and e.global_position.distance_to(global_position) < 6.0:
+					others.append(e)
+			others.sort_custom(func(a, b): return a.global_position.distance_to(global_position) < b.global_position.distance_to(global_position))
+			for e in others.slice(0, 2):
+				Fx.flash(get_parent(), e.global_position + Vector3(0, 1.2, 0), Color(0.7, 0.8, 1.0), 3.0, 5.0, 0.2)
+				Fx.spawn(get_parent(), "frost", e.global_position + Vector3(0, 1.0, 0), 0.8, 18.0)
+				e.hurt(amount, global_position, 0.5, by, false)
+			if not others.is_empty():
+				Sfx.play_at("bolt_impact", global_position, -6.0, 0.15, 0.1)
+
+
+func _process_elements(delta: float) -> void:
+	if puppet or state == State.DEAD:
+		return
+	_chill_t = maxf(_chill_t - delta, 0.0)
+	if _burn_t > 0.0:
+		_burn_t -= delta
+		if _burn_t <= 0.0:
+			_burn_dps = 0.0
+	for p in _poison:
+		p[0] -= delta
+	_poison = _poison.filter(func(p): return p[0] > 0.0)
+	_dot_tick -= delta
+	if _dot_tick > 0.0:
+		return
+	_dot_tick = 0.5
+	var dmg := (_burn_dps if _burn_t > 0.0 else 0.0) * 0.5
+	for p in _poison:
+		dmg += float(p[1]) * 0.5
+	if dmg <= 0.0:
+		return
+	if _burn_t > 0.0:
+		Fx.spawn(get_parent(), "explosion", global_position + Vector3(randf_range(-0.3, 0.3), float(d.body_h) * 0.6, randf_range(-0.3, 0.3)), 0.7, 20.0)
+	hurt(dmg, global_position, 0.0, _dot_by if is_instance_valid(_dot_by) else null, false, false)
 
 
 func _puppet_step(delta: float) -> void:
@@ -569,9 +659,4 @@ func _puppet_step(delta: float) -> void:
 		_hit_fx()  # struck by the ally: same gore and thud as one of our own hits
 	_net_flash_prev = flash
 	_frozen = _net_flags & 1 != 0
-	if _frozen:
-		sprite.modulate = Color(0.55, 0.85, 1.3)
-	elif flash or _flash_t > 0.0:
-		sprite.modulate = Color(1.6, 0.55, 0.5)
-	else:
-		sprite.modulate = _base_tint
+	sprite.modulate = _tint_for(_frozen, flash or _flash_t > 0.0, _net_flags & 4 != 0, _net_flags & 8 != 0, _net_flags & 16 != 0)

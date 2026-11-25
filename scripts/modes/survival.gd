@@ -25,6 +25,8 @@ const Projectile := preload("res://scripts/combat/projectile.gd")
 const Hazard := preload("res://scripts/combat/hazard.gd")
 const UiTheme := preload("res://scripts/ui/ui_theme.gd")
 const Maps := preload("res://scripts/data/maps.gd")
+const Forge := preload("res://scripts/data/forge.gd")
+const ForgeChoice := preload("res://scripts/ui/forge_choice.gd")
 
 enum Phase { PREP, NIGHT, CLEARED, DAWN, TELEPORT, BOSS, OVER }
 
@@ -68,7 +70,9 @@ var stats := {
 }
 var _prep_len := 4.0
 var boss_entry: Dictionary = {}
-var _new_weapon := false
+## Weapons offered by the last boss slain (chosen when back at the keep).
+var _forge_offer: Array = []
+var forge_ui: CanvasLayer
 var _flow_t := 0.0
 
 # ---- duo
@@ -118,6 +122,8 @@ func _ready() -> void:
 	add_child(pause_menu)
 	game_over = GameOver.new()
 	add_child(game_over)
+	forge_ui = ForgeChoice.new()
+	add_child(forge_ui)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	Sfx.music(Maps.night_music(wave + 1))
 	Sfx.ambience(Maps.ambience(Game.selected_map))
@@ -127,7 +133,21 @@ func _ready() -> void:
 		player.equip_torch()
 	if Game.test.has("tier"):
 		for i in int(Game.test["tier"]):
-			player.upgrade_weapon()
+			player.weapon_tier += 1
+			player.equip_weapon(Forge.forge(player.class_id, player.weapon_tier, rng))
+	if Game.test.has("forge"):
+		# test hook: show the forge as after the given number of bosses
+		var lv := int(Game.test["forge"])
+		var offer := []
+		for i in 3:
+			offer.append(Forge.forge(player.class_id, lv, rng))
+		forge_ui.open.call_deferred(offer, player.weapon(), "SPOILS OF THE BARROW THRONE", "Choose a weapon forged from the fallen  -  press 1, 2 or 3")
+	if Game.test.has("enchant"):
+		# test hook: force an enchantment (flame, frost, venom, storm, shadow, holy)
+		var tw: Dictionary = player.weapon().duplicate(true)
+		tw.enchant = str(Game.test["enchant"])
+		tw.name = Forge.weapon_name(tw)
+		player.equip_weapon(tw)
 	if Game.test.has("wave") and host:
 		wave = int(Game.test["wave"]) - 1
 	if Game.test.has("face"):
@@ -548,7 +568,11 @@ func _boss_fall_view(e: Node) -> void:
 	var nm := str(e.d.name).to_upper() if e != null and is_instance_valid(e) else "THE TYRANT"
 	var col: Color = e.d.get("color", UiTheme.GOLD) if e != null and is_instance_valid(e) else UiTheme.GOLD
 	hud.show_banner("%s FALLS" % nm, "...but death is patient", col)
-	_new_weapon = player.upgrade_weapon()
+	# the spoils: three forged weapons, chosen back at the keep
+	player.weapon_tier += 1
+	_forge_offer = []
+	for i in 3:
+		_forge_offer.append(Forge.forge(player.class_id, player.weapon_tier, rng))
 	player.heal(player.max_hp)
 	# a breath of silence after the kill; dawn brings its own tune
 	Sfx.stop_music(2.5)
@@ -652,12 +676,17 @@ func _return_to_keep() -> void:
 	Sfx.ambience(Maps.ambience(Game.selected_map))
 	await get_tree().create_timer(0.2).timeout
 	hud.fade_from(0.9)
-	if _new_weapon:
-		_new_weapon = false
+	if not _forge_offer.is_empty():
+		var offer := _forge_offer
+		_forge_offer = []
 		Sfx.play("weapon_upgrade")
-		var w: Dictionary = player.weapon()
-		hud.show_banner("NEW WEAPON: %s" % str(w.name).to_upper(), str(w.desc), UiTheme.GOLD)
-		await get_tree().create_timer(3.4).timeout
+		forge_ui.open(offer, player.weapon(), "SPOILS OF %s" % str(boss_entry.get("arena_name", "THE ARENA")), "Choose a weapon forged from the fallen  -  press 1, 2 or 3")
+		var picked: Dictionary = await forge_ui.chosen
+		if picked != player.weapon():
+			player.equip_weapon(picked)
+			hud.show_banner(str(picked.name).to_upper(), "is now in your hand", Boons.RARITY_COLOR.get(str(picked.rarity), UiTheme.GOLD))
+			if Game.test.has("log"):
+				print("[forge] took %s (%s)" % [picked.name, picked.rarity])
 	if host and phase == Phase.TELEPORT:
 		_begin_dawn()
 
@@ -864,6 +893,8 @@ func net_event(_from: int, kind: String, a: Array) -> void:
 			var e: Node = enemies_by_id.get(int(a[0]))
 			if e != null and is_instance_valid(e):
 				e.hurt(float(a[1]), a[2], float(a[3]), partner)
+				if a.size() > 5 and str(a[4]) != "" and is_instance_valid(e):
+					e.apply_element(str(a[4]), float(a[5]), partner)
 		"e_stun":
 			var e2: Node = enemies_by_id.get(int(a[0]))
 			if e2 != null and is_instance_valid(e2):
@@ -1074,6 +1105,7 @@ func save_run() -> void:
 			"boons": player.boons,
 			"charms": player.charms,
 			"weapon_tier": player.weapon_tier,
+			"weapon": player.weapon(),
 			"torch": player.has_torch,
 			"undying": player.undying,
 		},
@@ -1104,8 +1136,12 @@ func _restore(d: Dictionary) -> void:
 	for c in p.get("charms", []):
 		if typeof(c) == TYPE_DICTIONARY and c.has("mods"):
 			player.apply_charm(c)
-	for i in int(p.get("weapon_tier", 0)):
-		player.upgrade_weapon()
+	player.weapon_tier = int(p.get("weapon_tier", 0))
+	var saved_w = p.get("weapon", null)
+	if typeof(saved_w) == TYPE_DICTIONARY and saved_w.has("base"):
+		player.equip_weapon(saved_w)
+	elif player.weapon_tier > 0:
+		player.equip_weapon(Forge.from_tier(player.class_id, player.weapon_tier))
 	if bool(p.get("torch", false)):
 		player.equip_torch()
 	player.hp = clampf(float(p.get("hp", player.max_hp)), 1.0, player.max_hp)

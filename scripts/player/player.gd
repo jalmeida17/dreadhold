@@ -9,7 +9,7 @@ signal boon_applied(id: String)
 
 const ClassData := preload("res://scripts/data/classes.gd")
 const Boons := preload("res://scripts/data/boons.gd")
-const Weapons := preload("res://scripts/data/weapons.gd")
+const Forge := preload("res://scripts/data/forge.gd")
 const Charms := preload("res://scripts/data/charms.gd")
 const KITS := {
 	"warrior": preload("res://scripts/player/kits/warrior_kit.gd"),
@@ -42,6 +42,7 @@ var mods := {
 	"execute": 0.0, "thorns": 0.0,
 	"cleave_range": 0.0, "cleave_heal": 0.0, "spin_bonus": 0.0, "charge_bonus": 0.0,
 	"splash": 0.0, "extra_fireball": 0.0, "nova_bonus": 0.0, "pierce": 0.0, "volley_extra": 0.0,
+	"holy": 0.0,
 }
 var boons := {}
 ## Generated trinkets bought from Grizzle (scripts/data/charms.gd), in order of purchase.
@@ -78,7 +79,10 @@ var hit_marker := 0.0
 var slow_t := 0.0
 var has_torch := false
 var _torch_light: OmniLight3D
+## Weapons forged so far (one per boss slain) and the one in hand (scripts/data/forge.gd).
 var weapon_tier := 0
+var weapon_data: Dictionary = {}
+var _weapon_mods: Dictionary = {}
 var _death_t := 0.0
 ## Test autopilot only: where the bot wants to walk.
 var bot_wish := Vector3.ZERO
@@ -120,6 +124,7 @@ func setup(p_class: String, p_arena: Node3D, p_director: Node) -> void:
 	kit.name = "Kit"
 	add_child(kit)
 	kit.setup(self)
+	equip_weapon(Forge.starter(class_id))
 
 
 # =================================================================== input & movement
@@ -178,24 +183,31 @@ func equip_torch() -> void:
 
 
 func weapon() -> Dictionary:
-	return Weapons.WEAPONS[class_id][weapon_tier]
+	return weapon_data
 
 
-func upgrade_weapon() -> bool:
-	## Claim the next weapon tier (after a boss). Returns false at the last tier.
-	var tiers: Array = Weapons.WEAPONS[class_id]
-	if weapon_tier >= tiers.size() - 1:
-		return false
-	weapon_tier += 1
-	var w: Dictionary = tiers[weapon_tier]
-	var b: Dictionary = w.bonus
-	for k in b:
-		mods[k] = float(mods.get(k, 0.0)) + float(b[k])
-	if ResourceLoader.exists(w.sheet):
-		kit.weapon_tex = load(w.sheet)
+func equip_weapon(w: Dictionary) -> void:
+	## Swap the weapon in hand: its bonuses replace the previous weapon's.
+	for k in _weapon_mods:
+		mods[k] = float(mods.get(k, 0.0)) - float(_weapon_mods[k])
+	weapon_data = w
+	_weapon_mods = Forge.mods(w)
+	for k in _weapon_mods:
+		mods[k] = float(mods.get(k, 0.0)) + float(_weapon_mods[k])
+	var sheet := Forge.sheet(w)
+	if ResourceLoader.exists(sheet):
+		kit.weapon_tex = load(sheet)
+	var mp := Forge.mask(w)
+	kit.weapon_mask = load(mp) if mp != "" else null
 	power_flash = 1.0
-	Sfx.play("boon_select")
-	return true
+
+
+func weapon_element() -> String:
+	return Forge.element(weapon_data)
+
+
+func weapon_element_power() -> float:
+	return Forge.element_power(weapon_data)
 
 
 func _physics_process(delta: float) -> void:
@@ -470,6 +482,8 @@ func compute_damage(base: float, target: Node) -> float:
 	var dmg: float = base * mods.damage
 	if mods.execute > 0.0 and target != null and target.has_method("hp_ratio") and target.hp_ratio() < 0.35:
 		dmg *= 1.0 + mods.execute
+	if mods.holy > 0.0 and target != null and (bool(target.get("is_boss")) or bool(target.get("elite"))):
+		dmg *= 1.0 + mods.holy
 	if randf() < mods.crit:
 		dmg *= mods.crit_mult
 		hit_marker = 1.0

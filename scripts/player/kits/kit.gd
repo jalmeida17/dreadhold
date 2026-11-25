@@ -6,6 +6,8 @@ var resource := 0.0
 var resource_max := 100.0
 var resource_regen := 0.0
 var weapon_tex: Texture2D
+## Forge mask of the weapon sheet (red: material, blue: enchantment glow), or null.
+var weapon_mask: Texture2D
 var weapon_frames := 4
 var weapon_frame := 0
 var weapon_x := 0.0
