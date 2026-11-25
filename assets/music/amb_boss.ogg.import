@@ -12,7 +12,7 @@ dest_files=["res://.godot/imported/amb_boss.ogg-949dc3576794b67be37a37c0c6917421
 
 [params]
 
-loop=false
+loop=true
 loop_offset=0
 bpm=0
 beat_count=0

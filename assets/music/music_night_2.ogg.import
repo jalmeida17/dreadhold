@@ -12,7 +12,7 @@ dest_files=["res://.godot/imported/music_night_2.ogg-c0585636e24efb265b49f4b609b
 
 [params]
 
-loop=false
+loop=true
 loop_offset=0
 bpm=0
 beat_count=0

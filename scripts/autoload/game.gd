@@ -198,12 +198,16 @@ func _setup_cursor() -> void:
 # ------------------------------------------------------------------ audio buses & settings
 
 func _setup_buses() -> void:
-	for bus_name in ["Music", "SFX"]:
-		if AudioServer.get_bus_index(bus_name) == -1:
-			AudioServer.add_bus()
-			var idx := AudioServer.bus_count - 1
-			AudioServer.set_bus_name(idx, bus_name)
-			AudioServer.set_bus_send(idx, "Master")
+	## Master, Music, SFX. The bus list is sized in one call: adding buses one by one with
+	## add_bus() scrambles their order in the browser's Web Audio graph, where they end up
+	## feeding each other in a loop that the browser mutes (no sound at all on the web).
+	if AudioServer.get_bus_index("Music") != -1 and AudioServer.get_bus_index("SFX") != -1:
+		return
+	AudioServer.bus_count = 3
+	AudioServer.set_bus_name(1, "Music")
+	AudioServer.set_bus_name(2, "SFX")
+	AudioServer.set_bus_send(1, "Master")
+	AudioServer.set_bus_send(2, "Master")
 
 
 func apply_settings() -> void:
