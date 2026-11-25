@@ -15,6 +15,7 @@ const Bosses2 := preload("res://tools/art/bosses2.gd")
 const Tex2 := preload("res://tools/art/textures2.gd")
 const Props2 := preload("res://tools/art/props2.gd")
 const Champions := preload("res://tools/art/champions.gd")
+const Forge := preload("res://tools/art/forge_weapons.gd")
 
 var previews := {}
 
@@ -47,6 +48,9 @@ func _init() -> void:
 	if all or "champions" in only:
 		gen_champions()
 		print("  [t] champions %d ms" % (Time.get_ticks_msec() - t0))
+	if all or "forge" in only:
+		gen_forge()
+		print("  [t] forge %d ms" % (Time.get_ticks_msec() - t0))
 	write_previews()
 	print("gen_art done in %d ms" % (Time.get_ticks_msec() - t0))
 	quit()
@@ -183,6 +187,24 @@ func gen_champions() -> void:
 	if previews.has("champions_vs_enemies"):
 		for im in previews["champions"]:
 			previews["champions_vs_enemies"].append(im)
+
+
+func gen_forge() -> void:
+	## Weapon forge base weapons (neutral palette) + tint masks, plus preview sheets in
+	## tools/preview/ (forge_sheets, forge_masks, forge_tints_<class>: shader formula applied).
+	## Optional subset while iterating: -- only=forge forge=sword,crossbow
+	print("[forge]")
+	var kinds: Array = Forge.ALL
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("forge="):
+			kinds = Array(a.substr(6).split(","))
+	var built: Array = []
+	for k in kinds:
+		var r: Array = Forge.build(k)
+		save(r[0], "res://assets/weapons/forge/%s.png" % k)
+		save(r[1], "res://assets/weapons/forge/%s_mask.png" % k)
+		built.append([k, r[0], r[1]])
+	Forge.write_previews(built, "res://tools/preview")
 
 
 func gen_ui() -> void:

@@ -14,8 +14,10 @@ void fragment() {
 	if (has_mask) {
 		vec4 m = texture(mask_tex, UV);
 		col *= mix(vec3(1.0), tint, m.r);
-		float pulse = 0.78 + 0.22 * sin(TIME * 3.0);
-		col += glow * m.b * glow_power * pulse;
+		// glowing zones take the enchantment's hue (an additive glow would wash out to white)
+		float pulse = 0.8 + 0.2 * sin(TIME * 3.0);
+		vec3 lit = glow * (0.45 + 1.1 * col) * pulse;
+		col = mix(col, lit, m.b * clamp(glow_power, 0.0, 1.0));
 	} else {
 		col *= mix(vec3(1.0), tint, 0.45);
 	}
