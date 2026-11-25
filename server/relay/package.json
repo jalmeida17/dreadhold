@@ -1,0 +1,13 @@
+{
+  "name": "dreadhold-relay",
+  "private": true,
+  "description": "WebSocket relay for Dreadhold duo vigils (Cloudflare Worker + Durable Objects).",
+  "scripts": {
+    "dev": "wrangler dev --port 8791 --ip 127.0.0.1",
+    "deploy": "wrangler deploy",
+    "test": "node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
