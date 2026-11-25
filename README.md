@@ -56,18 +56,32 @@ asset is the [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) font (SIL 
 
 - **Doom-style FPS feel**: fast movement, billboard sprite enemies, chunky pixel rendering
   (the 3D world renders at 640×360, while the UI stays sharp at 1280×720).
-- **Three champions**, each with its own resource and kit (see below), and **weapon upgrades**: every boss
-  slain grants the next weapon tier, shown in hand (Bearded Axe → Reaver Greataxe → Doomcleaver,
-  Ember Staff → Moonsilver Staff → Staff of the Burning Eye, Yew Longbow → Hornbow of the Wilds → Wyrmbone Greatbow).
-- **Four battlefields** to choose from:
+- **Three champions**, each with its own resource and kit (see below).
+- **An endless vigil**: the forges below generate content without end, and the dead grow much
+  stronger every night (more of them, tougher, faster, with golden **elites** from night 6).
+- **The weapon forge**: every boss slain offers three generated weapons to choose from: a base
+  (axe, greataxe, longsword, mace, warhammer; staff, scepter, bonestaff; longbow, recurve, crossbow)
+  × a material (Iron up to Voidglass, then +1, +2…) × an enchantment (burning, frost, venom, chain
+  lightning, shadow, holy) × properties, with a rarity and a name such as
+  *Thundering Bloodsteel Warhammer of the Hawk*, coloured in hand by its material and enchantment.
+- **The monster forge**: from night 3, every night brings its own species assembled from modular parts
+  (body, head, armour, weapon, off-hand, elemental aura) with traits: swift, ironclad, bloodthirsty,
+  volatile, splitting, undying, phasing, frenzied, hulking. The night banner names them.
+- **Five battlefields** to choose from:
   - *Blackstone Keep*: a moonlit courtyard;
   - *The Sunken Crypt*: a vaulted ossuary of corridors and tombs;
   - *Hollowmere*: a misty ruined village;
-  - *The Defiled Cathedral*: a dark nave cut by a rood screen and walled chapels.
+  - *The Defiled Cathedral*: a dark nave cut by a rood screen and walled chapels;
+  - *Uncharted Lands*: the **arena forge** builds a new battlefield for every vigil (ruins, ossuary,
+    foundry, glacier, mire or temple, each with its own name, layout and atmosphere).
 - **Survival mode, "The Vigil"**:
-  - **Nights**: each one is a wave of ghouls, skeletons, bone archers, shadow acolytes and barrow brutes.
-  - **At dawn**, *Grizzle the black-market goblin* appears. Trade with him to buy abilities and upgrades, potions or healing (and an off-hand torch for warriors), or restock his wares.
-  - **Every 5th night**, you are teleported into a boss arena. The four bosses take turns, and later cycles bring them back stronger. Each boss has three phases: every shattered phylactery makes it angrier.
+  - **Nights**: waves of ghouls, skeletons, bone archers, shadow acolytes, barrow brutes and the forged species.
+  - **At dawn**, *Grizzle the black-market goblin* appears. Trade with him to buy abilities, generated
+    **charms** (one to four bonuses, rarer and stronger as the nights go by, so his stock never runs dry),
+    potions or healing (and an off-hand torch for warriors), or restock his wares. His prices rise every night.
+  - **Every 5th night**, you are teleported into a boss arena. The four legends below come first; from night 25
+    the **boss forge** creates a new boss every time (body, element, mechanics, name, arena). Each boss has three
+    phases: every shattered phylactery makes it angrier.
 
     | Boss | Arena | Signature attacks |
     |---|---|---|
