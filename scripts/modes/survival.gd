@@ -397,7 +397,7 @@ func _wave_flavour() -> String:
 
 
 func _compose_wave(n: int) -> Array:
-	var budget := 6 + n * 4
+	var budget := 6 + n * 4 + int(0.15 * n * n)
 	if _duo_live():
 		budget = int(budget * DUO_WAVE)
 	var types := ["ghoul", "skeleton"]
@@ -410,7 +410,7 @@ func _compose_wave(n: int) -> Array:
 	var out: Array = []
 	while budget > 0:
 		var t: String = types[rng.randi_range(0, types.size() - 1)]
-		if t == "brute" and rng.randf() < 0.55:
+		if t == "brute" and rng.randf() < maxf(0.55 - 0.03 * (n - 4), 0.1):
 			t = "skeleton"
 		var c: int = EnemyData.TYPES[t].cost
 		if c > budget:
@@ -427,8 +427,13 @@ func _duo_live() -> bool:
 
 
 func _max_alive() -> int:
-	var n := mini(8 + wave * 2, 30)
-	return int(n * DUO_ALIVE) if _duo_live() else n
+	var n := mini(10 + wave * 2, 36)
+	return mini(int(n * DUO_ALIVE), 48) if _duo_live() else n
+
+
+func _elite_chance() -> float:
+	## Elites appear from night 6 and grow common (up to 35% of a wave).
+	return clampf(0.04 * float(wave - 5), 0.0, 0.35)
 
 
 func _process_spawning(delta: float) -> void:
@@ -437,7 +442,7 @@ func _process_spawning(delta: float) -> void:
 	spawn_t -= delta
 	if spawn_t > 0.0 or alive_count >= _max_alive():
 		return
-	spawn_t = maxf(1.1 - wave * 0.05, 0.35) * rng.randf_range(0.7, 1.3)
+	spawn_t = maxf(1.1 - wave * 0.05, 0.3) * rng.randf_range(0.7, 1.3)
 	var t: String = queue.pop_front()
 	var pts: Array = arena.spawn_points()
 	var ts := targets()
@@ -451,10 +456,10 @@ func _process_spawning(delta: float) -> void:
 		return m
 	pts.sort_custom(func(a, b): return away.call(a) > away.call(b))
 	var p: Vector3 = pts[rng.randi_range(0, mini(2, pts.size() - 1))]
-	spawn_enemy(t, p + Vector3(rng.randf_range(-0.5, 0.5), 0, rng.randf_range(-0.5, 0.5)))
+	spawn_enemy(t, p + Vector3(rng.randf_range(-0.5, 0.5), 0, rng.randf_range(-0.5, 0.5)), 1.0, 1.0, rng.randf() < _elite_chance())
 
 
-func spawn_enemy(type_id: String, pos: Vector3, hp_mult: float = 1.0, dmg_mult: float = 1.0) -> Node:
+func spawn_enemy(type_id: String, pos: Vector3, hp_mult: float = 1.0, dmg_mult: float = 1.0, elite: bool = false) -> Node:
 	## Host (or solo) only: a new foe. In duo the ally's machine gets a puppet of it.
 	var e: CharacterBody3D = Enemy.new()
 	entities.add_child(e)
@@ -470,19 +475,21 @@ func spawn_enemy(type_id: String, pos: Vector3, hp_mult: float = 1.0, dmg_mult: 
 		e.max_hp *= mult
 		e.hp = e.max_hp
 	e.damage *= dmg_mult
+	if elite and not e.is_boss:
+		e.make_elite()
 	alive_count += 1
-	_spawn_fx(type_id, pos)
+	_spawn_fx(type_id, pos, e.elite)
 	if duo:
-		Game.net.send("e_spawn", [e.net_id, type_id, pos, e.max_hp])
+		Game.net.send("e_spawn", [e.net_id, type_id, pos, e.max_hp, e.elite])
 	return e
 
 
-func _spawn_fx(type_id: String, pos: Vector3) -> void:
+func _spawn_fx(type_id: String, pos: Vector3, elite: bool = false) -> void:
 	var big: bool = EnemyData.TYPES[type_id].get("boss", false)
-	Fx.spawn(entities, "portal", pos + Vector3(0, 1.0, 0), 4.5 if big else 2.0, 6.0)
-	Fx.flash(entities, pos + Vector3(0, 1.2, 0), Color(0.35, 1.0, 0.45), 2.5, 6.0, 0.8)
+	Fx.spawn(entities, "portal", pos + Vector3(0, 1.0, 0), 4.5 if big else (2.6 if elite else 2.0), 6.0)
+	Fx.flash(entities, pos + Vector3(0, 1.2, 0), Color(1.0, 0.7, 0.25) if elite else Color(0.35, 1.0, 0.45), 2.5, 6.0, 0.8)
 	Sfx.play_at("enemy_spawn", pos, -4.0, 0.1, 0.15)
-	hud.ping(pos)
+	hud.ping(pos, Color(1.0, 0.75, 0.2) if elite else Color(1.0, 0.25, 0.2))
 
 
 func summon_minions(center: Vector3, count: int, types: Array = ["skeleton", "ghoul"]) -> void:
@@ -513,7 +520,7 @@ func on_enemy_killed(e: Node) -> void:
 	enemies_by_id.erase(e.net_id)
 	alive_count = maxi(alive_count - 1, 0)
 	wave_killed += 1
-	score += int(e.d.score) * (1 + wave / 5)
+	score += int(e.d.score) * (1 + wave / 5) * (2 if e.elite else 1)
 	var kbt: Dictionary = stats.kills_by_type
 	kbt[e.type_id] = int(kbt.get(e.type_id, 0)) + 1
 	var killer: int = Game.net.my_id()
@@ -884,7 +891,7 @@ func net_event(_from: int, kind: String, a: Array) -> void:
 			score = int(a[1])
 			_game_over_view()
 		"e_spawn":
-			_spawn_puppet(int(a[0]), str(a[1]), a[2], float(a[3]))
+			_spawn_puppet(int(a[0]), str(a[1]), a[2], float(a[3]), a.size() > 4 and bool(a[4]))
 		"e_die":
 			var dead: Node = enemies_by_id.get(int(a[0]))
 			if dead != null and is_instance_valid(dead):
@@ -916,7 +923,7 @@ func net_event(_from: int, kind: String, a: Array) -> void:
 			player.apply_slow(float(a[0]))
 
 
-func _spawn_puppet(id: int, type_id: String, pos: Vector3, max_hp: float) -> void:
+func _spawn_puppet(id: int, type_id: String, pos: Vector3, max_hp: float, elite: bool = false) -> void:
 	var e: CharacterBody3D = Enemy.new()
 	e.puppet = true
 	entities.add_child(e)
@@ -926,9 +933,11 @@ func _spawn_puppet(id: int, type_id: String, pos: Vector3, max_hp: float) -> voi
 	e.max_hp = max_hp
 	e.hp = max_hp
 	e._net_pos = e.global_position
+	if elite:
+		e.elite_look()
 	enemies_by_id[id] = e
 	alive_count += 1
-	_spawn_fx(type_id, pos)
+	_spawn_fx(type_id, pos, elite)
 	if e.is_boss:
 		_present_boss(e)
 

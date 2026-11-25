@@ -43,6 +43,8 @@ var _cast_mode := ""
 var _dist := 99.0
 var _spawn_h := 0.0
 var is_boss := false
+## Elite: a tougher, larger, golden version of a common foe (from night 6).
+var elite := false
 var phase := 1
 var _base_tint := Color(1, 1, 1)
 var _atk_mult := 1.0
@@ -65,14 +67,18 @@ func setup(p_type: String, p_arena: Node3D, p_player: Node3D, p_director: Node, 
 	player = p_player
 	director = p_director
 	is_boss = d.get("boss", false)
-	var scale_hp := 1.0 + 0.09 * float(level - 1)
-	var scale_dmg := 1.0 + 0.05 * float(level - 1)
+	# the dead grow stronger every night, faster and faster
+	var n := float(maxi(level - 1, 0))
+	var scale_hp := 1.0 + 0.12 * n + 0.004 * n * n
+	var scale_dmg := 1.0 + 0.06 * n + 0.0015 * n * n
 	if is_boss:
-		scale_hp = 1.0 + 0.35 * float(level / 5 - 1)
+		scale_hp = 1.0 + 0.5 * float(maxi(level / 5 - 1, 0))
+		scale_dmg = 1.0 + 0.05 * n
 	max_hp = float(d.hp) * scale_hp
 	hp = max_hp
 	damage = float(d.damage) * scale_dmg
-	speed = float(d.speed) * randf_range(0.92, 1.08)
+	speed = float(d.speed) * randf_range(0.92, 1.08) * (1.0 + minf(0.012 * n, 0.25))
+	_atk_mult = 1.0 - minf(0.01 * n, 0.2)
 	radius = d.radius
 	atk_cd = randf_range(0.5, 1.5)
 	_strafe = 1.0 if randf() < 0.5 else -1.0
@@ -100,6 +106,23 @@ func setup(p_type: String, p_arena: Node3D, p_player: Node3D, p_director: Node, 
 	sprite.position.y = -_spawn_h * 0.5
 	state = State.SPAWN
 	state_t = 0.0
+
+
+func make_elite() -> void:
+	## Host side: stronger stats, then the look (puppets only take the look).
+	max_hp *= 2.5
+	hp = max_hp
+	damage *= 1.4
+	elite_look()
+
+
+func elite_look() -> void:
+	elite = true
+	_base_tint = Color(1.35, 0.95, 0.55)
+	sprite.modulate = _base_tint
+	_spawn_h *= 1.2
+	sprite.scale = Vector3.ONE * 1.2
+	sprite.position.y = -_spawn_h * 0.5
 
 
 func is_alive() -> bool:
@@ -376,7 +399,7 @@ func _die_local() -> void:
 		Fx.spawn(get_parent(), gib, global_position + Vector3(randf_range(-0.3, 0.3), float(d.body_h) * randf_range(0.3, 0.8), randf_range(-0.3, 0.3)), 1.2, 12.0, true)
 	# loot
 	var g: Array = d.gold
-	var total := int(randi_range(int(g[0]), int(g[1])) * director.loot_scale())
+	var total := int(randi_range(int(g[0]), int(g[1])) * director.loot_scale() * (2.5 if elite else 1.0))
 	var coins := clampi(total / 3 + 1, 1, 6)
 	for i in coins:
 		Pickup.drop(get_parent(), "gold", global_position, maxi(total / coins, 1))

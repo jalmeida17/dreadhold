@@ -9,6 +9,12 @@ const PRICES := {"common": 60, "rare": 110, "epic": 180, "legendary": 300}
 const POTION_PRICE := 40
 const MEND_PRICE := 30
 const TORCH_PRICE := 50
+const RESTOCK_PRICE := 20
+const RESTOCK_STEP := 15
+## Grizzle's prices climb every night (+8% per night survived), and each rank of an ability
+## you already own makes the next one 35% dearer.
+const INFLATION_PER_NIGHT := 0.08
+const RANK_MARKUP := 0.35
 const QUOTES := [
 	"Psst... finest goods this side of the grave!",
 	"No refunds. No questions. No witnesses.",
@@ -41,6 +47,7 @@ var _portrait_frames: Array = []
 var stock: Array = []          # [{kind, id, price, sold}]
 var selected := 0
 var restock_cost := 20
+var _restocks := 0
 var rng := RandomNumberGenerator.new()
 var _laugh_t := 0.0
 
@@ -237,18 +244,33 @@ func restore_stock(saved: Array, cost: int) -> void:
 
 func new_stock() -> void:
 	## Called at each dawn: 6 random abilities/upgrades + supplies.
-	restock_cost = 20
+	_restocks = 0
+	restock_cost = _price(RESTOCK_PRICE)
 	_roll()
+
+
+func inflation() -> float:
+	return 1.0 + INFLATION_PER_NIGHT * float(maxi(int(director.wave) - 1, 0))
+
+
+func _price(base: float) -> int:
+	## Prices are rounded to 5 gold.
+	return int(round(base * inflation() / 5.0)) * 5
+
+
+func _boon_price(id: String) -> int:
+	var owned := int(player.boons.get(id, 0))
+	return _price(float(PRICES[Boons.BOONS[id].rarity]) * (1.0 + RANK_MARKUP * owned))
 
 
 func _roll() -> void:
 	stock.clear()
 	for id in Boons.roll(player.class_id, player.boons, 6, rng):
-		stock.append({"kind": "boon", "id": id, "price": int(PRICES[Boons.BOONS[id].rarity]), "sold": false})
+		stock.append({"kind": "boon", "id": id, "price": _boon_price(id), "sold": false})
 	if player.class_id == "warrior" and not player.has_torch:
-		stock.append({"kind": "torch", "id": "torch", "price": TORCH_PRICE, "sold": false})
-	stock.append({"kind": "potion", "id": "potion", "price": POTION_PRICE, "sold": false})
-	stock.append({"kind": "mend", "id": "mend", "price": MEND_PRICE, "sold": false})
+		stock.append({"kind": "torch", "id": "torch", "price": _price(TORCH_PRICE), "sold": false})
+	stock.append({"kind": "potion", "id": "potion", "price": _price(POTION_PRICE), "sold": false})
+	stock.append({"kind": "mend", "id": "mend", "price": _price(MEND_PRICE), "sold": false})
 	selected = 0
 
 
@@ -505,7 +527,8 @@ func _restock() -> void:
 		Sfx.play("ui_click", -6.0)
 		return
 	player.gold -= restock_cost
-	restock_cost += 15
+	_restocks += 1
+	restock_cost = _price(RESTOCK_PRICE + RESTOCK_STEP * _restocks)
 	_roll()
 	director.save_run()
 	Sfx.play("ui_confirm")
