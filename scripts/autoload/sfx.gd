@@ -55,6 +55,13 @@ func _ready() -> void:
 	_amb = AudioStreamPlayer.new()
 	_amb.bus = "SFX"
 	add_child(_amb)
+	# safety net for the browser, whose sample player may ignore the loop flag:
+	# a track that ends while it is still the current one starts again
+	for p in [_music_a, _music_b]:
+		p.finished.connect(_on_music_finished.bind(p))
+	_amb.finished.connect(func():
+		if _amb_name != "" and _amb.stream != null:
+			_amb.play())
 
 
 func stream_for(sound: String, dir: String = SFX_DIR) -> AudioStream:
@@ -150,6 +157,11 @@ func music(track: String, fade: float = 1.5) -> void:
 	_music_a.play()
 	var tw2 := create_tween()
 	tw2.tween_property(_music_a, "volume_db", 0.0, fade)
+
+
+func _on_music_finished(p: AudioStreamPlayer) -> void:
+	if p == _music_a and _music_name != "" and p.stream != null:
+		p.play()
 
 
 func stop_music(fade: float = 1.0) -> void:
