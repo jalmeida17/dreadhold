@@ -523,24 +523,25 @@ func _build_map_page() -> void:
 func _map_card(id: String, index: int) -> Button:
 	var m: Dictionary = Maps.MAPS[id]
 	var btn := Button.new()
-	btn.position = Vector2(42 + index * 302, 150)
-	btn.custom_minimum_size = Vector2(290, 400)
-	btn.size = Vector2(290, 400)
+	btn.position = Vector2(42 + index * 302, 140)
+	btn.custom_minimum_size = Vector2(290, 430)
+	btn.size = Vector2(290, 430)
 	btn.add_theme_stylebox_override("normal", _plate_style(0))
 	btn.add_theme_stylebox_override("hover", _plate_style(1))
 	btn.add_theme_stylebox_override("pressed", _plate_style(2))
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	var v := VBoxContainer.new()
 	v.set_anchors_preset(Control.PRESET_FULL_RECT)
-	v.offset_left = 24
-	v.offset_top = 24
-	v.offset_right = -24
-	v.offset_bottom = -22
+	# keep everything well inside the gold inner frame of the plate
+	v.offset_left = 42
+	v.offset_top = 40
+	v.offset_right = -42
+	v.offset_bottom = -34
 	v.add_theme_constant_override("separation", 8)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(v)
 	var thumb := TextureRect.new()
-	thumb.custom_minimum_size = Vector2(240, 135)
+	thumb.custom_minimum_size = Vector2(206, 116)
 	thumb.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -549,18 +550,18 @@ func _map_card(id: String, index: int) -> Button:
 	if ResourceLoader.exists(m.thumb):
 		thumb.texture = load(m.thumb)
 	v.add_child(thumb)
-	var name_l := UiTheme.title(str(m.name).to_upper(), 22, UiTheme.GOLD)
+	var name_l := UiTheme.title(str(m.name).to_upper(), 21, UiTheme.GOLD)
 	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_l.custom_minimum_size = Vector2(238, 0)
+	name_l.custom_minimum_size = Vector2(206, 0)
 	v.add_child(name_l)
 	var diff := int(m.difficulty) - 1
 	v.add_child(UiTheme.label("Difficulty:  %s" % ["Easy", "Medium", "Hard"][diff], 16, [UiTheme.GREEN, Color(1.0, 0.8, 0.3), UiTheme.RED][diff]))
-	var desc := UiTheme.label(str(m.desc), 17, UiTheme.CREAM)
+	var desc := UiTheme.label(str(m.desc), 16, UiTheme.CREAM)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(238, 0)
+	desc.custom_minimum_size = Vector2(206, 0)
 	v.add_child(desc)
 	var key := UiTheme.title(str(index + 1), 18, UiTheme.GREY)
-	key.position = Vector2(254, 22)
+	key.position = Vector2(232, 44)
 	btn.add_child(key)
 	btn.mouse_entered.connect(func(): Sfx.play("ui_hover", -10.0))
 	btn.pressed.connect(func(): _select_map(id))
